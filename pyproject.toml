@@ -1,0 +1,30 @@
+[project]
+name = "devmate"
+version = "0.1.0"
+description = "DevMate: AI-powered coding assistant with MCP search and RAG"
+authors = [{name = "DevMate", email = "devmate@example.com"}]
+requires-python = "==3.13.*"
+dependencies = [
+    "langchain>=0.2.16",
+    "langchain-openai>=0.1.22",
+    "langchain-community>=0.2.10",
+    "pydantic-settings>=2.4.0",
+    "python-dotenv>=1.0.1",
+    "chromadb>=0.5.5",
+    "tavily-python>=0.4.0",
+    "mcp>=0.0.8",
+    "uvicorn>=0.30.0",
+]
+
+[build-system]
+requires = ["setuptools>=65"]
+build-backend = "setuptools.build_meta"
+
+[project.scripts]
+devmate = "devmate.__main__:main"
+ingest-docs = "devmate.scripts:ingest_cli"
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8.2.0",
+]
