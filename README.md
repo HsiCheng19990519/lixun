@@ -9,7 +9,7 @@
   - 客户端测试：`scripts/test_streamable_http_client.py` 初始化会话、列工具并调用 `search_web`。  
   - HTTP 直连兜底：`devmate/mcp_client/client.py` 支持 `http-direct` 调 `/tools/search_web`。
 - Stage 3：RAG（本地知识库）  
-  - 文档：`docs/internal_guidelines.md`、`docs/templates.md`。  
+  - 文档：`docs/internal_guidelines.md`、`docs/templates.md`、`docs/internal_fastapi_guidelines.md`（可继续扩充）。  
   - 向量库：`devmate/rag/ingest.py` + `langchain-chroma` + `BAAI/bge-m3`，持久化在 `data/vector_store`（遥测默认关闭）。  
   - 检索：`devmate/rag/retriever.py::search_knowledge_base`，脚本 `scripts/test_rag.py` 可手测。
 
@@ -65,9 +65,9 @@ Available tools: ['search_web']
 ```
 uv run python scripts/ingest_docs.py --rebuild
 ```
-预期日志结尾：  
+预期日志结尾类似：  
 ```
-Ingestion completed: 2 documents -> 3 chunks
+Ingestion completed: <N> documents -> <M> chunks
 ```
 说明：读取 `docs/`，切分并写入 `data/vector_store`。
 
@@ -75,11 +75,12 @@ Ingestion completed: 2 documents -> 3 chunks
 ```
 uv run python scripts/test_rag.py --query "project guidelines"
 ```
-预期输出包含本地文档片段：  
+预期输出包含本地文档片段（文件名视 docs/ 内容而定，例如）：  
 ```
 "results": [
   {"filename": "internal_guidelines.md", ...},
-  {"filename": "templates.md", ...}
+  {"filename": "templates.md", ...},
+  {"filename": "internal_fastapi_guidelines.md", ...}
 ]
 ```
 
@@ -91,7 +92,7 @@ uv run python scripts/test_rag.py --query "project guidelines"
 - `devmate/logging_utils.py`：stderr + 滚动日志。
 - `mcp_server/main.py`、`scripts/test_streamable_http_client.py`：MCP 搜索 server/client。
 - `devmate/rag/ingest.py`、`devmate/rag/retriever.py`、`scripts/ingest_docs.py`、`scripts/test_rag.py`：RAG 摄入与检索。
-- `docs/internal_guidelines.md`、`docs/templates.md`：本地知识库示例文档。
+- `docs/internal_guidelines.md`、`docs/templates.md`、`docs/internal_fastapi_guidelines.md`：本地知识库示例文档。
 
 ## 限制
 - 示例文档为简单示例，需按需扩充真实内容。
