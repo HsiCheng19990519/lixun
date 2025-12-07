@@ -20,10 +20,12 @@ def _default_server_params() -> StdioServerParameters:
     Pass through env/cwd to ensure .env and dependencies are visible.
     """
     root = Path(__file__).resolve().parents[2]
+    env = os.environ.copy()
+    env["MCP_TRANSPORT"] = env.get("MCP_TRANSPORT", "stdio")
     return StdioServerParameters(
         command=sys.executable,
         args=["-m", "mcp_server.main"],
-        env=os.environ.copy(),
+        env=env,
         cwd=str(root),
     )
 
@@ -33,8 +35,8 @@ async def call_search_web(
     max_results: int = 5,
     search_depth: str = "basic",
     server_params: Optional[StdioServerParameters] = None,
-    timeout_seconds: float = 60.0,
-    transport: str = "http",
+    timeout_seconds: float = 120.0,
+    transport: str = "stdio",
     http_url: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
@@ -49,7 +51,30 @@ async def call_search_web(
 
         try:
             async with stdio_client(params, errlog=err_file) as (read_stream, write_stream):
-                session = ClientSession(read_stream, write_stream)
+                async with ClientSession(read_stream, write_stream) as session:
+                    await asyncio.wait_for(session.initialize(), timeout=timeout_seconds)
+                    result = await asyncio.wait_for(
+                        session.call_tool(
+                            "search_web",
+                            arguments={
+                                "query": query,
+                                "max_results": max_results,
+                                "search_depth": search_depth,
+                            },
+                        ),
+                        timeout=timeout_seconds,
+                    )
+                    return result.model_dump()
+        finally:
+            if err_file:
+                err_file.close()
+
+    elif transport == "sse":
+        # SSE transport: server must be running and listening (FastMCP.run_sse_async)
+        sse_url = os.environ.get("MCP_SSE_URL", "http://127.0.0.1:8000/sse")
+        url = sse_url
+        async with sse_client(url) as (read_stream, write_stream):
+            async with ClientSession(read_stream, write_stream) as session:
                 await asyncio.wait_for(session.initialize(), timeout=timeout_seconds)
                 result = await asyncio.wait_for(
                     session.call_tool(
@@ -63,49 +88,26 @@ async def call_search_web(
                     timeout=timeout_seconds,
                 )
                 return result.model_dump()
-        finally:
-            if err_file:
-                err_file.close()
-
-    elif transport == "sse":
-        # SSE transport: server must be running and listening (FastMCP.run_sse_async)
-        sse_url = os.environ.get("MCP_SSE_URL", "http://127.0.0.1:8000/sse")
-        url = sse_url
-        async with sse_client(url) as (read_stream, write_stream):
-            session = ClientSession(read_stream, write_stream)
-            await asyncio.wait_for(session.initialize(), timeout=timeout_seconds)
-            result = await asyncio.wait_for(
-                session.call_tool(
-                    "search_web",
-                    arguments={
-                        "query": query,
-                        "max_results": max_results,
-                        "search_depth": search_depth,
-                    },
-                ),
-                timeout=timeout_seconds,
-            )
-            return result.model_dump()
 
     elif transport == "http":
-        url = http_url or os.environ.get("MCP_HTTP_URL", "http://127.0.0.1:8000/mcp")
+        url = http_url or os.environ.get("MCP_HTTP_URL", "http://127.0.0.1:8010/mcp")
         from mcp.client.streamable_http import streamablehttp_client
 
         async with streamablehttp_client(url) as (read_stream, write_stream, _get_session_id):
-            session = ClientSession(read_stream, write_stream)
-            await asyncio.wait_for(session.initialize(), timeout=timeout_seconds)
-            result = await asyncio.wait_for(
-                session.call_tool(
-                    "search_web",
-                    arguments={
-                        "query": query,
-                        "max_results": max_results,
-                        "search_depth": search_depth,
-                    },
-                ),
-                timeout=timeout_seconds,
-            )
-            return result.model_dump()
+            async with ClientSession(read_stream, write_stream) as session:
+                await asyncio.wait_for(session.initialize(), timeout=timeout_seconds)
+                result = await asyncio.wait_for(
+                    session.call_tool(
+                        "search_web",
+                        arguments={
+                            "query": query,
+                            "max_results": max_results,
+                            "search_depth": search_depth,
+                        },
+                    ),
+                    timeout=timeout_seconds,
+                )
+                return result.model_dump()
 
     else:
         raise ValueError(f"Unsupported transport: {transport}")
@@ -118,3 +120,26 @@ def run_cli(query: str, max_results: int = 5, search_depth: str = "basic") -> No
     settings = Settings()
     setup_logging(settings)
     asyncio.run(call_search_web(query, max_results=max_results, search_depth=search_depth))
+
+
+def call_search_web_sync(
+    query: str,
+    max_results: int = 5,
+    search_depth: str = "basic",
+    transport: str = "stdio",
+    http_url: Optional[str] = None,
+    timeout_seconds: float = 120.0,
+) -> Dict[str, Any]:
+    """
+    Synchronous wrapper around call_search_web for agent/tool usage.
+    """
+    return asyncio.run(
+        call_search_web(
+            query=query,
+            max_results=max_results,
+            search_depth=search_depth,
+            transport=transport,
+            http_url=http_url,
+            timeout_seconds=timeout_seconds,
+        )
+    )
