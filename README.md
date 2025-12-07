@@ -70,7 +70,7 @@ uv run python scripts/test_rag.py --query "project guidelines"
 8) 运行 Agent（Stage 4 演示）  
 ```
 uv run python main.py --message "我想构建一个展示附近徒步路线的网站项目" --transport stdio --k 4 \
-  --provider ollama --model qwen2.5:7b-instruct --ai-base-url http://127.0.0.1:11434/v1
+  --provider ollama --model qwen2.5:14b-instruct --ai-base-url http://127.0.0.1:11434/v1
 ```
 - 可用 `--transport http --mcp-http-url http://127.0.0.1:8010/mcp` 切换 HTTP；需要有效 `TAVILY_API_KEY`。  
 - 观测性：设置 `LANGCHAIN_TRACING_V2=true` 及 LangSmith 相关 key 后，CLI 会初始化 tracing。
