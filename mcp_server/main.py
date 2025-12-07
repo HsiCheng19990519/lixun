@@ -10,7 +10,7 @@ from devmate.config import Settings
 from devmate.logging_utils import setup_logging
 
 settings = Settings()
-mcp_transport = os.environ.get("MCP_TRANSPORT", "streamable-http")  # stdio | sse | streamable-http
+mcp_transport = os.environ.get("MCP_TRANSPORT", "stdio")  # stdio | sse | streamable-http
 host = os.environ.get("MCP_HOST", "127.0.0.1")
 port = int(os.environ.get("MCP_PORT", "8010"))
 mcp = FastMCP("devmate-mcp-search", json_response=True, host=host, port=port)

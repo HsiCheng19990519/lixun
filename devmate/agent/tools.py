@@ -20,6 +20,8 @@ from devmate.mcp_client.client import call_search_web_sync
 
 logger = logging.getLogger(__name__)
 
+ALLOWED_DEPTHS = {"basic", "advanced"}
+
 
 def _resolve_transport(explicit: Optional[str], settings: Settings) -> str:
     """
@@ -79,18 +81,22 @@ def build_tools(
         MCP Tavily web search. Uses the configured transport (http/stdio/sse).
         """
         try:
+            depth = search_depth.lower() if isinstance(search_depth, str) else "basic"
+            if depth not in ALLOWED_DEPTHS:
+                logger.warning("search_web depth=%s is invalid; falling back to 'basic'", search_depth)
+                depth = "basic"
             logger.info(
                 "Tool search_web called query=%s max_results=%s depth=%s transport=%s http_url=%s",
                 query,
                 max_results,
-                search_depth,
+                depth,
                 resolved_transport,
                 resolved_http_url,
             )
             result = call_search_web_sync(
                 query=query,
                 max_results=max_results,
-                search_depth=search_depth,
+                search_depth=depth,
                 transport=resolved_transport,
                 http_url=resolved_http_url,
             )
