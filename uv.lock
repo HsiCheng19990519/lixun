@@ -476,6 +476,7 @@ dependencies = [
     { name = "fastapi" },
     { name = "huggingface-hub" },
     { name = "langchain" },
+    { name = "langchain-chroma" },
     { name = "langchain-community" },
     { name = "langchain-deepseek" },
     { name = "langchain-huggingface" },
@@ -495,6 +496,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.115.0" },
     { name = "huggingface-hub", specifier = ">=0.24.0" },
     { name = "langchain", specifier = ">=1.1.0" },
+    { name = "langchain-chroma", specifier = ">=0.1.0" },
     { name = "langchain-community", specifier = ">=0.3.0" },
     { name = "langchain-deepseek", specifier = ">=0.1.0" },
     { name = "langchain-huggingface", specifier = ">=0.1.0" },
@@ -1043,6 +1045,20 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/53/7c/127a4b15434bed166c1d81ff3ae7c86d19d41c27ca92b42fbbed0c9bb2a3/langchain-1.1.2.tar.gz", hash = "sha256:5d59557cf9939ff6db60c09bbfca80742865c511ddc33b24fc27920b2bb6157b", size = 530827, upload-time = "2025-12-04T17:59:46.419Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b8/50/7413db85fab5f1b16523d3353ac45ecd83c439b4b7ffad7681d14f0eb55b/langchain-1.1.2-py3-none-any.whl", hash = "sha256:b8154e1ff090093ab5b3d6eee0e51ac91d83b5f42af0258700594a47a3a6b089", size = 102147, upload-time = "2025-12-04T17:59:45.466Z" },
+]
+
+[[package]]
+name = "langchain-chroma"
+version = "1.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "chromadb" },
+    { name = "langchain-core" },
+    { name = "numpy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/6c/b5/1dfb361793b217c7e8e791edebf5ecbbcc7fed2e9fd998b452c32c701c1f/langchain_chroma-1.0.0.tar.gz", hash = "sha256:ee82c6fbd0c94e5e9942e3b9302f69deea6c58c0e957ff16de6066d896d7a34a", size = 217313, upload-time = "2025-10-17T15:18:54.557Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/05/fd/36d8d37a257d7f5961cea9ef0e1a9616a4b4fc259cad2cbf02416de90215/langchain_chroma-1.0.0-py3-none-any.whl", hash = "sha256:b7adb991090f066f8d5e746a2d338de3116b192cec3990deef3052b7ea07324c", size = 12458, upload-time = "2025-10-17T15:18:53.325Z" },
 ]
 
 [[package]]
