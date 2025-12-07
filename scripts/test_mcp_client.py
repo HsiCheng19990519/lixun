@@ -14,8 +14,9 @@ async def main() -> None:
     parser.add_argument("--query", required=True, help="Search query")
     parser.add_argument("--max-results", type=int, default=5)
     parser.add_argument("--search-depth", default="basic", choices=["basic", "advanced"])
-    parser.add_argument("--transport", default="http", choices=["http", "sse", "stdio"])
-    parser.add_argument("--http-url", default=None, help="Streamable HTTP endpoint (default http://127.0.0.1:8000/mcp)")
+    parser.add_argument("--transport", default="stdio", choices=["http", "sse", "stdio"])
+    parser.add_argument("--http-url", default=None, help="Streamable HTTP endpoint (default http://127.0.0.1:8010/mcp)")
+    parser.add_argument("--timeout", type=float, default=120.0, help="Timeout seconds for MCP calls")
     args = parser.parse_args()
 
     settings = Settings()
@@ -27,6 +28,7 @@ async def main() -> None:
         search_depth=args.search_depth,
         transport=args.transport,
         http_url=args.http_url,
+        timeout_seconds=args.timeout,
     )
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
