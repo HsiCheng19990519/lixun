@@ -1,6 +1,6 @@
 # DevMate（Stage 1-3）
 
-本分支覆盖 Stage 1（环境/依赖/配置基线）、Stage 2（MCP 搜索工具）与 Stage 3（本地 RAG）。Stage 4 及之后的 Agent/容器/观测性未实现。
+本分支覆盖 Stage 1（环境/依赖/配置基线）、Stage 2（MCP 搜索工具）与 Stage 3（本地 RAG）。后续 Agent/Docker/观测性未实现。
 
 ## 已完成
 - Stage 1：`uv` 管理 Python 3.13；`pyproject.toml` 声明 LangChain 1.x、langchain-chroma、ChatDeepSeek/HF 等依赖；`devmate/config.py::Settings` 统一读取（env > .env > config.toml），敏感文件忽略已处理。
@@ -24,9 +24,14 @@ uv sync
 - LLM/Embedding：`MODEL_NAME`、`EMBEDDING_MODEL_NAME`，闭源时 `AI_BASE_URL`、`API_KEY`  
 - RAG：`VECTOR_STORE_DIR`、`CHUNK_SIZE`、`CHUNK_OVERLAP`（可选）
 
-3) 环境快速验证（仅实例化，不发请求）  
+3) 最小环境验证（仅实例化，不发请求）  
 ```
 uv run python scripts/check_env.py
+```
+预期输出（示例，类名可能随配置变化）：  
+```
+LLM: <class 'langchain_openai.chat_models.base.ChatOpenAI'>
+Embedding: <class 'langchain_huggingface.embeddings.huggingface.HuggingFaceEmbeddings'>
 ```
 
 4) 启动 MCP 服务器（默认 stdio，可切换 transport）  
@@ -74,6 +79,6 @@ uv run python scripts/test_rag.py --query "project guidelines"
 - Windows 环境下 stdio 可用；SSE/HTTP 需对应 transport/端口。  
 - 必须设置 `TAVILY_API_KEY` 才能获得真实搜索结果。  
 
-## 修改记录（MCP 客户端超时修复）
-- 曾遇 stdio 模式 `ClientSession` 初始化超时，已通过在客户端侧使用 `async with ClientSession(...)` 包裹会话修复。  
-- 参考讨论：https://stackoverflow.com/questions/79692462/fastmcp-client-timing-out-while-initializing-the-session  
+## 问题解决记录
+1) MCP 客户端 stdio 初始化超时：客户端侧使用 `async with ClientSession(...)` 包裹会话，避免 `session.initialize()` 卡死。参考讨论 https://stackoverflow.com/questions/79692462/fastmcp-client-timing-out-while-initializing-the-session。 
+2) 网络搜索工具调用 400（search_depth 非法）：此前 Agent 传入 `search_depth=medium` 导致 Tavily 400。现工具侧对 `search_depth` 做校验，非法值回退为 `basic`（Tavily 仅接受 basic/advanced，参见 https://docs.tavily.com/documentation/api-reference/endpoint/search）。 
