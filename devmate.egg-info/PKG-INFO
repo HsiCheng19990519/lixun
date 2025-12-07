@@ -15,3 +15,4 @@ Requires-Dist: langsmith>=0.1.0
 Requires-Dist: fastapi>=0.115.0
 Requires-Dist: uvicorn>=0.30.0
 Requires-Dist: huggingface-hub>=0.24.0
+Requires-Dist: modelcontextprotocol>=0.1.0

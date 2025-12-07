@@ -18,6 +18,7 @@ dependencies = [
   "fastapi>=0.115.0",
   "uvicorn>=0.30.0",
   "huggingface-hub>=0.24.0",
+  "modelcontextprotocol>=0.1.0",
 ]
 
 [project.scripts]
@@ -34,4 +35,5 @@ package = true
 dev = []
 
 [tool.setuptools.packages.find]
-include = ["devmate*"]
+include = ["devmate*", "mcp_server*"]
+exclude = ["docker*", "docs*", "scripts*"]

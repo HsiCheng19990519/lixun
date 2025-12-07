@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import logging
+import sys
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
@@ -41,7 +42,8 @@ def setup_logging(settings: Settings) -> logging.Logger:
     )
 
     # 3. 控制台输出 handler
-    console_handler = logging.StreamHandler()
+    # Use stderr for console logs to avoid polluting stdout (important for stdio protocols like MCP).
+    console_handler = logging.StreamHandler(stream=sys.stderr)
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
 
