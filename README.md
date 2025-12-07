@@ -1,6 +1,6 @@
 # DevMate（Stage 1-3）
 
-本分支覆盖 Stage 1（环境/依赖/配置基线）、Stage 2（MCP 搜索工具）与 Stage 3（本地 RAG）。后续 Agent/Docker/观测性未实现。
+本分支覆盖 Stage 1（环境/依赖/配置基线）、Stage 2（MCP 搜索工具）、Stage 3（本地 RAG）与 Stage 4（Agent 工具编排）。后续 Docker/完整观测性未实现。
 
 ## 已完成
 - Stage 1：`uv` 管理 Python 3.13；`pyproject.toml` 声明 LangChain 1.x、langchain-chroma、ChatDeepSeek/HF 等依赖；`devmate/config.py::Settings` 统一读取（env > .env > config.toml），敏感文件忽略已处理。
@@ -12,6 +12,10 @@
   - 文档：`docs/internal_guidelines.md`、`docs/templates.md`、`docs/internal_fastapi_guidelines.md`。  
   - 向量库：`devmate/rag/ingest.py`（langchain-chroma + BAAI/bge-m3，持久化 `data/vector_store`，遥测关闭）。  
   - 检索：`devmate/rag/retriever.py::search_knowledge_base`，脚本 `scripts/test_rag.py` 可验证。
+- Stage 4：Agent（工具编排）  
+  - 核心：`devmate/agent/core.py`，系统提示强制先查本地（RAG）再查网络（MCP），三段式输出（Plan/Findings/Files）。  
+  - 工具：`devmate/agent/tools.py` 包装 `search_knowledge_base` + `search_web`，校验 `search_depth` 非法值回退为 `basic`。  
+  - 入口：`main.py` / `devmate/cli.py` 支持命令行参数覆盖模型、transport、超时等；`observability.py` 可开启 LangSmith（需配置环境变量）。
 
 ## 快速开始
 1) 安装依赖  
@@ -63,6 +67,26 @@ uv run python scripts/test_rag.py --query "project guidelines"
 ```
 预期命中本地文档片段（文件名视 docs/ 内容而定）。
 
+8) 运行 Agent（Stage 4 演示）  
+```
+uv run python main.py --message "我想构建一个展示附近徒步路线的网站项目" --transport stdio --k 4 \
+  --provider ollama --model qwen2.5:7b-instruct --ai-base-url http://127.0.0.1:11434/v1
+```
+- 可用 `--transport http --mcp-http-url http://127.0.0.1:8010/mcp` 切换 HTTP；需要有效 `TAVILY_API_KEY`。  
+- 观测性：设置 `LANGCHAIN_TRACING_V2=true` 及 LangSmith 相关 key 后，CLI 会初始化 tracing。
+预期输出（示例，具体内容随模型/搜索结果变化）：  
+```
+### 计划
+...（规划要点）
+
+### 找到资料
+- 本地文档：internal_guidelines.md / templates.md 等摘要
+- 网络搜索：若 Tavily 200，则列出标题+URL 摘要；若失败，会注明。
+
+### 文件
+- 列出建议生成/修改的文件与示例代码块
+```
+
 ## 文件速览
 - `pyproject.toml`：LangChain 1.x、langchain-chroma、langchain-deepseek、langchain-huggingface、sentence-transformers 等依赖；脚本入口。
 - `.env` / `config.toml`：LLM/Embedding/Tavily 配置示例。
@@ -75,10 +99,10 @@ uv run python scripts/test_rag.py --query "project guidelines"
 - `docs/*`：本地知识库示例文档。
 
 ## 限制
-- 仅涵盖 Stage 1-3；Agent/Docker/观测链路未提供。  
+- 仅涵盖 Stage 1-4；Docker/完整观测链路未提供。  
 - Windows 环境下 stdio 可用；SSE/HTTP 需对应 transport/端口。  
 - 必须设置 `TAVILY_API_KEY` 才能获得真实搜索结果。  
 
 ## 问题解决记录
-1) MCP 客户端 stdio 初始化超时：客户端侧使用 `async with ClientSession(...)` 包裹会话，避免 `session.initialize()` 卡死。参考讨论 https://stackoverflow.com/questions/79692462/fastmcp-client-timing-out-while-initializing-the-session。 
-2) 网络搜索工具调用 400（search_depth 非法）：此前 Agent 传入 `search_depth=medium` 导致 Tavily 400。现工具侧对 `search_depth` 做校验，非法值回退为 `basic`（Tavily 仅接受 basic/advanced，参见 https://docs.tavily.com/documentation/api-reference/endpoint/search）。 
+1) MCP 客户端 stdio 初始化超时：客户端侧使用 `async with ClientSession(...)` 包裹会话，避免 `session.initialize()` 卡死。参考讨论 https://stackoverflow.com/questions/79692462/fastmcp-client-timing-out-while-initializing-the-session。  
+2) 网络搜索工具 400（search_depth 非法）：Agent 曾传 `search_depth=medium` 触发 Tavily 400。现工具侧校验并回退为 `basic`（Tavily 仅接受 basic/advanced，参见 https://docs.tavily.com/documentation/api-reference/endpoint/search）。 
