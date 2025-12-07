@@ -12,8 +12,7 @@ import logging
 from typing import Any, Dict
 
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
-from langchain_community.chat_models import ChatDeepSeek
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 
 from .config import Settings
 
@@ -32,6 +31,26 @@ def _build_common_params(settings: Settings) -> Dict[str, Any]:
     return params
 
 
+def _import_chat_deepseek():
+    """
+    Import ChatDeepSeek from available providers.
+
+    LangChain versions may expose it under langchain_community or langchain_deepseek.
+    """
+    try:
+        from langchain_community.chat_models import ChatDeepSeek  # type: ignore
+        return ChatDeepSeek
+    except Exception:
+        try:
+            from langchain_deepseek import ChatDeepSeek  # type: ignore
+            return ChatDeepSeek
+        except Exception as exc:  # pragma: no cover
+            raise ImportError(
+                "ChatDeepSeek is not available. Install langchain-deepseek "
+                "or upgrade langchain_community."
+            ) from exc
+
+
 def build_chat_model(settings: Settings):
     """
     Create a chat model according to the configured provider.
@@ -44,6 +63,7 @@ def build_chat_model(settings: Settings):
 
     if provider == "deepseek":
         logger.info("Initializing ChatDeepSeek with model=%s", settings.model_name)
+        ChatDeepSeek = _import_chat_deepseek()
         return ChatDeepSeek(**params)
 
     logger.info(
