@@ -27,7 +27,11 @@ def _build_common_params(settings: Settings) -> Dict[str, Any]:
     if settings.api_key:
         params["api_key"] = settings.api_key
     if settings.ai_base_url:
-        params["base_url"] = settings.ai_base_url
+        base_url = settings.ai_base_url.strip()
+        if base_url and not (base_url.startswith("http://") or base_url.startswith("https://")):
+            logger.warning("Invalid AI_BASE_URL (missing http/https), ignoring: %s", base_url)
+        else:
+            params["base_url"] = base_url
     return params
 
 
@@ -66,10 +70,21 @@ def build_chat_model(settings: Settings):
         ChatDeepSeek = _import_chat_deepseek()
         return ChatDeepSeek(**params)
 
+    if provider == "ollama" and not params.get("base_url"):
+        # Provide sensible default for local Ollama (OpenAI-compatible endpoint).
+        params["base_url"] = "http://127.0.0.1:11434/v1"
+        logger.info("LLM provider=ollama, using default base_url=%s", params["base_url"])
+
+    if provider != "ollama" and not params.get("base_url"):
+        raise ValueError(
+            f"LLM provider '{provider}' requires AI_BASE_URL (e.g., OpenAI/compatible endpoint). "
+            "Set AI_BASE_URL and API_KEY or switch to provider=ollama with a local server."
+        )
+
     logger.info(
         "Initializing ChatOpenAI with model=%s base_url=%s",
         settings.model_name,
-        settings.ai_base_url,
+        params.get("base_url"),
     )
     return ChatOpenAI(**params)
 

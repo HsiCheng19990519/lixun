@@ -20,10 +20,12 @@ def _default_server_params() -> StdioServerParameters:
     Pass through env/cwd to ensure .env and dependencies are visible.
     """
     root = Path(__file__).resolve().parents[2]
+    env = os.environ.copy()
+    env["MCP_TRANSPORT"] = "stdio"
     return StdioServerParameters(
         command=sys.executable,
         args=["-m", "mcp_server.main"],
-        env=os.environ.copy(),
+        env=env,
         cwd=str(root),
     )
 
@@ -118,3 +120,24 @@ def run_cli(query: str, max_results: int = 5, search_depth: str = "basic") -> No
     settings = Settings()
     setup_logging(settings)
     asyncio.run(call_search_web(query, max_results=max_results, search_depth=search_depth))
+
+
+def call_search_web_sync(
+    query: str,
+    max_results: int = 5,
+    search_depth: str = "basic",
+    transport: str = "http",
+    http_url: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Synchronous wrapper around call_search_web for agent/tool usage.
+    """
+    return asyncio.run(
+        call_search_web(
+            query=query,
+            max_results=max_results,
+            search_depth=search_depth,
+            transport=transport,
+            http_url=http_url,
+        )
+    )

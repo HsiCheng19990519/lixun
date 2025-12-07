@@ -1,0 +1,103 @@
+from __future__ import annotations
+
+"""
+Tool definitions for the DevMate agent (Stage 4).
+
+Exposes:
+- search_knowledge_base: local RAG over persisted Chroma store
+- search_web: MCP-based Tavily search
+"""
+
+import logging
+import os
+from typing import Any, Dict, List, Optional
+
+from langchain.tools import tool
+
+from devmate.config import Settings
+from devmate.rag.retriever import search_knowledge_base
+from devmate.mcp_client.client import call_search_web_sync
+
+logger = logging.getLogger(__name__)
+
+
+def _resolve_transport(explicit: Optional[str], settings: Settings) -> str:
+    """
+    Decide MCP transport based on explicit arg > env > settings default.
+    """
+    if explicit:
+        return explicit
+    env_transport = os.environ.get("MCP_TRANSPORT")
+    if env_transport:
+        return env_transport
+    return settings.mcp_transport
+
+
+def _resolve_http_url(explicit: Optional[str], settings: Settings) -> Optional[str]:
+    if explicit:
+        return explicit
+    return settings.mcp_http_url
+
+
+def build_tools(
+    settings: Optional[Settings] = None,
+    *,
+    transport: Optional[str] = None,
+    http_url: Optional[str] = None,
+    default_k: int = 4,
+):
+    """
+    Return a list of LangChain tools for the agent.
+    """
+    cfg = settings or Settings()
+    resolved_transport = _resolve_transport(transport, cfg)
+    resolved_http_url = _resolve_http_url(http_url, cfg)
+
+    @tool("search_knowledge_base", return_direct=False)
+    def search_knowledge_base_tool(query: str, k: int = default_k) -> Dict[str, Any]:
+        """
+        Query the local knowledge base (Chroma). Returns matched chunks with metadata.
+        """
+        try:
+            logger.info("Tool search_knowledge_base called query=%s k=%s", query, k)
+            result = search_knowledge_base(
+                query=query,
+                settings=cfg,
+                persist_dir=None,
+                k=k,
+            )
+            if not result.get("results"):
+                return {"error": "no_local_results", "message": "No local knowledge base hits."}
+            return result
+        except Exception as exc:
+            logger.exception("search_knowledge_base failed: %s", exc)
+            return {"error": "search_knowledge_base_failed", "message": str(exc)}
+
+    @tool("search_web", return_direct=False)
+    def search_web_tool(query: str, max_results: int = 5, search_depth: str = "basic") -> Dict[str, Any]:
+        """
+        MCP Tavily web search. Uses the configured transport (http/stdio/sse).
+        """
+        try:
+            logger.info(
+                "Tool search_web called query=%s max_results=%s depth=%s transport=%s http_url=%s",
+                query,
+                max_results,
+                search_depth,
+                resolved_transport,
+                resolved_http_url,
+            )
+            result = call_search_web_sync(
+                query=query,
+                max_results=max_results,
+                search_depth=search_depth,
+                transport=resolved_transport,
+                http_url=resolved_http_url,
+            )
+            # normalize to dict (call_search_web may return dict already)
+            return result if isinstance(result, dict) else dict(result)
+        except Exception as exc:
+            logger.exception("search_web failed: %s", exc)
+            return {"error": "search_web_failed", "message": str(exc), "transport": resolved_transport}
+
+    return [search_knowledge_base_tool, search_web_tool]

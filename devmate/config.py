@@ -71,6 +71,10 @@ class Settings(BaseSettings):
     langsmith_project: Optional[str] = "devmate"
     langsmith_endpoint: Optional[str] = None
 
+    # ---------- MCP client ----------
+    mcp_transport: str = "http"  # http | stdio | sse
+    mcp_http_url: Optional[str] = None
+
     # ---------- Logging ----------
     log_level: str = "INFO"
     log_file: str = "logs/devmate.log"

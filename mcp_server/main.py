@@ -10,6 +10,7 @@ from devmate.config import Settings
 from devmate.logging_utils import setup_logging
 
 settings = Settings()
+mcp_transport = os.environ.get("MCP_TRANSPORT", "streamable-http")  # stdio | sse | streamable-http
 host = os.environ.get("MCP_HOST", "127.0.0.1")
 port = int(os.environ.get("MCP_PORT", "8010"))
 mcp = FastMCP("devmate-mcp-search", json_response=True, host=host, port=port)
@@ -46,6 +47,6 @@ async def search_web(
 
 
 if __name__ == "__main__":
-    logger.info("Starting MCP server (streamable-http) on %s:%s ...", host, port)
+    logger.info("Starting MCP server transport=%s host=%s port=%s ...", mcp_transport, host, port)
     # Officially recommended entrypoint: let FastMCP run the server.
-    mcp.run(transport="streamable-http")  # default http://host:port/mcp
+    mcp.run(transport=mcp_transport)
