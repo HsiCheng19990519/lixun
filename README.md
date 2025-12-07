@@ -3,11 +3,11 @@
 本分支覆盖 Stage 1（环境/依赖/配置基线）、Stage 2（MCP 搜索工具）与 Stage 3（本地 RAG）。后续 Agent/Docker/观测性未实现。
 
 ## 已完成
-- Stage 1：`uv` 管理 Python 3.13；`pyproject.toml` 声明 LangChain 1.x 等依赖；`devmate/config.py::Settings` 统一读取（env > .env > config.toml），敏感文件忽略已处理。
+- Stage 1：`uv` 管理 Python 3.13；`pyproject.toml` 声明 LangChain 1.x、langchain-chroma、ChatDeepSeek/HF 等依赖；`devmate/config.py::Settings` 统一读取（env > .env > config.toml），敏感文件忽略已处理。
 - Stage 2：MCP 搜索（FastMCP，集成 Tavily）  
   - 服务器：`mcp_server/main.py` 暴露 `search_web`，支持 `stdio` / `sse` / `streamable-http`（默认 stdio，可用 `MCP_TRANSPORT` 切换），需 `TAVILY_API_KEY`。  
   - 客户端：`devmate/mcp_client/client.py`、`scripts/test_mcp_client.py` 默认 stdio，可切换 SSE/HTTP。  
-  - Tavily 实现：`mcp_server/tools.py::SearchService` / `mcp_server/main.py::call_tavily`。
+  - Tavily 调用：`mcp_server/tools.py::SearchService` / `mcp_server/main.py::call_tavily`。  
 - Stage 3：RAG  
   - 文档：`docs/internal_guidelines.md`、`docs/templates.md`、`docs/internal_fastapi_guidelines.md`。  
   - 向量库：`devmate/rag/ingest.py`（langchain-chroma + BAAI/bge-m3，持久化 `data/vector_store`，遥测关闭）。  
@@ -24,9 +24,14 @@ uv sync
 - LLM/Embedding：`MODEL_NAME`、`EMBEDDING_MODEL_NAME`，闭源时 `AI_BASE_URL`、`API_KEY`  
 - RAG：`VECTOR_STORE_DIR`、`CHUNK_SIZE`、`CHUNK_OVERLAP`（可选）
 
-3) 环境快速验证（仅实例化，不发请求）  
+3) 最小环境验证（仅实例化，不发请求）  
 ```
 uv run python scripts/check_env.py
+```
+预期输出（示例，类名可能随配置变化）：  
+```
+LLM: <class 'langchain_openai.chat_models.base.ChatOpenAI'>
+Embedding: <class 'langchain_huggingface.embeddings.huggingface.HuggingFaceEmbeddings'>
 ```
 
 4) 启动 MCP 服务器（默认 stdio，可切换 transport）  
@@ -44,13 +49,13 @@ uv run python scripts/test_mcp_client.py --query "model context protocol"
 ```
 - HTTP：`--transport http --http-url http://127.0.0.1:8010/mcp`  
 - SSE：`--transport sse`（需 server 以 sse 启动）  
-预期：输出 Tavily 结果（或缺 key 的错误），`logs/mcp_server_stderr.log` 可见 `search_web query=...`。
+预期：输出 Tavily 结果（缺 key 时会提示错误），`logs/mcp_server_stderr.log` 可见 `search_web query=...`。
 
 6) 文档摄入（Stage 3）  
 ```
 uv run python scripts/ingest_docs.py --rebuild
 ```
-说明：读取 `docs/`，切分并写入 `data/vector_store`（遥测关闭）。
+说明：读取 `docs/`，切分并写入 `data/vector_store`（遥测已禁用）。
 
 7) 知识库查询（Stage 3 验证）  
 ```
@@ -74,6 +79,5 @@ uv run python scripts/test_rag.py --query "project guidelines"
 - Windows 环境下 stdio 可用；SSE/HTTP 需对应 transport/端口。  
 - 必须设置 `TAVILY_API_KEY` 才能获得真实搜索结果。  
 
-## 修改记录（MCP 客户端超时修复）
-- 曾遇 stdio 模式 `ClientSession` 初始化超时，已通过在客户端侧使用 `async with ClientSession(...)` 包裹会话修复。  
-- 参考讨论：https://stackoverflow.com/questions/79692462/fastmcp-client-timing-out-while-initializing-the-session  
+## 问题解决记录
+1) MCP 客户端 stdio 初始化超时：在客户端侧使用 `async with ClientSession(...)` 包裹会话，避免 `session.initialize()` 卡死。参考讨论 https://stackoverflow.com/questions/79692462/fastmcp-client-timing-out-while-initializing-the-session。 
