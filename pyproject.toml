@@ -1,0 +1,37 @@
+[project]
+name = "devmate"
+version = "0.1.0"
+description = "DevMate: coding assistant agent with MCP, RAG and web search"
+readme = "README.md"
+requires-python = ">=3.13"
+
+# Core dependencies (managed with uv; LangChain 1.x required)
+dependencies = [
+  "langchain>=1.1.0",
+  "langchain-openai>=0.2.0",
+  "langchain-community>=0.3.0",
+  "langchain-text-splitters>=0.3.0",
+  "chromadb>=0.5.0",
+  "pydantic-settings>=2.5.0",
+  "tavily-python>=0.3.0",
+  "langsmith>=0.1.0",
+  "fastapi>=0.115.0",
+  "uvicorn>=0.30.0",
+  "huggingface-hub>=0.24.0",
+]
+
+[project.scripts]
+devmate = "devmate.cli:main"
+
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.uv]
+package = true
+
+[dependency-groups]
+dev = []
+
+[tool.setuptools.packages.find]
+include = ["devmate*"]

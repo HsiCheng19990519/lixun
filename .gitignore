@@ -1,0 +1,22 @@
+# Python cache
+__pycache__/
+*.pyc
+
+# Virtual environment (uv default)
+.venv/
+
+# Local config with secrets
+.env
+config.toml
+*.env
+
+# Generated data and outputs
+data/
+generated_projects/
+
+# Editor settings
+.vscode/
+.idea/
+
+# Logs
+*.log

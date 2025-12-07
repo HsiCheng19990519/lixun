@@ -1,0 +1,17 @@
+Metadata-Version: 2.4
+Name: devmate
+Version: 0.1.0
+Summary: DevMate: coding assistant agent with MCP, RAG and web search
+Requires-Python: >=3.13
+Description-Content-Type: text/markdown
+Requires-Dist: langchain>=1.1.0
+Requires-Dist: langchain-openai>=0.2.0
+Requires-Dist: langchain-community>=0.3.0
+Requires-Dist: langchain-text-splitters>=0.3.0
+Requires-Dist: chromadb>=0.5.0
+Requires-Dist: pydantic-settings>=2.5.0
+Requires-Dist: tavily-python>=0.3.0
+Requires-Dist: langsmith>=0.1.0
+Requires-Dist: fastapi>=0.115.0
+Requires-Dist: uvicorn>=0.30.0
+Requires-Dist: huggingface-hub>=0.24.0
