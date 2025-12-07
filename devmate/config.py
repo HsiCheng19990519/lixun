@@ -19,7 +19,7 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-def _load_toml_config(_: BaseSettings) -> Dict[str, Any]:
+def _load_toml_config(_: BaseSettings | None = None) -> Dict[str, Any]:
     """Load values from config.toml if present; ignore errors silently."""
     path = Path("config.toml")
     if not path.exists():
@@ -35,6 +35,9 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
+        extra="ignore",
+        alias_generator=lambda s: s.upper(),
+        populate_by_name=True,
     )
 
     # ---------- LLM ----------
