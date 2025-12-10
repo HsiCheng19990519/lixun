@@ -117,4 +117,3 @@ uv run python main.py --stage5 --transport stdio --k 6 --max-iterations 8 \
 ## 问题解决记录
 1) MCP 客户端 stdio 初始化超时：客户端侧使用 `async with ClientSession(...)` 包裹会话，避免 `session.initialize()` 卡死。参考讨论 https://stackoverflow.com/questions/79692462/fastmcp-client-timing-out-while-initializing-the-session。  
 2) 网络搜索工具 400（search_depth 非法）：Agent 曾传 `search_depth=medium` 触发 Tavily 400。现工具侧校验并回退为 `basic`（Tavily 仅接受 basic/advanced，参见 https://docs.tavily.com/documentation/api-reference/endpoint/search）。
-3) 模型不生成 `pyproject.toml`：在系统提示词中明确要求交付物必须包含 `main.py`（入口，含 `main()`）和 `pyproject.toml`（Python 3.13，uv/LangChain 依赖可配置）。

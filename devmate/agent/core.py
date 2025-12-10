@@ -53,7 +53,6 @@ Follow this workflow strictly:
    - Call `search_web` (MCP/Tavily) next for external best practices/API docs. Do NOT fabricate web findings.
    Do not deliver the final answer before both calls complete.
    The final answer MUST include concrete and completed code/file blocks (not just plans) to satisfy the user's requirements. For example, if the user plans to create a website, you should give the code to generate the website.
-   Deliverables must include at least two files: `main.py` as the entrypoint (with `main()`) and `pyproject.toml` (Python 3.13, uv/LangChain deps). Also provide a sample CLI run command such as `uv run python main.py`.
 3) Combine local + web findings, then propose files to create/modify.
 4) When generating code, always show: file path + code block. Use this exact format per file:
 ```path: relative/original/path.ext
@@ -66,6 +65,7 @@ Final answer MUST have three sections:
 - Findings (local docs / web, with sources)
 - Files (path + content or actions)
 """
+# Deliverables must include at least two files: `main.py` as the entrypoint (with `main()`) and `pyproject.toml` (Python 3.13, uv/LangChain deps). Also provide a sample CLI run command such as `uv run python main.py`.
 
 
 FILE_BLOCK_RE = re.compile(
