@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import argparse
-from typing import Any, Dict, Optional
+import json
+from pathlib import Path
+from typing import Any, Dict, Optional, Tuple
 
 from devmate.agent.core import run_agent
 from devmate.config import Settings
@@ -22,6 +24,10 @@ def _str2bool(val: Optional[str]) -> Optional[bool]:
     raise argparse.ArgumentTypeError(f"Invalid boolean value: {val}")
 
 
+DEFAULT_STAGE5_MESSAGE = "我想构建一个展示附近徒步路线的网站项目"
+DEFAULT_STAGE5_OUTPUT_DIR = Path("data") / "stage5_output"
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="DevMate Agent CLI (Stage 4)")
     parser.add_argument("-m", "--message", help="User request (if omitted, will prompt)")
@@ -29,6 +35,34 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--k", type=int, default=4, help="Top-k for RAG search_knowledge_base")
     parser.add_argument("--max-iterations", type=int, default=6, help="Max tool/LLM iterations")
     parser.add_argument("--session-name", default=None, help="Tracing session name")
+    parser.add_argument("--write-files", action="store_true", help="Persist generated files to disk")
+    parser.add_argument(
+        "--output-dir",
+        default=None,
+        help="Base directory for writing files (default: use paths from the agent output)",
+    )
+    parser.add_argument(
+        "--stage5",
+        action="store_true",
+        help="Enable Stage 5 helpers: default hiking prompt, auto-write files, and emit summary/report.",
+    )
+    parser.add_argument(
+        "--stage5-raw-output",
+        dest="stage5_raw_output",
+        default=None,
+        help="Path to save raw agent markdown output (Stage 5 mode). Defaults to <output_dir>/agent_output.md.",
+    )
+    parser.add_argument(
+        "--stage5-report",
+        dest="stage5_report",
+        default=None,
+        help="Path to save Stage 5 JSON summary. Defaults to <output_dir>/stage5_report.json.",
+    )
+    parser.add_argument(
+        "--fail-on-missing-search",
+        action="store_true",
+        help="Exit non-zero if Stage 5 mode and agent skips local or web search.",
+    )
 
     # LLM
     parser.add_argument("--llm-mode", dest="llm_mode", default=None, help="LLM mode (open_source/closed_source)")
@@ -72,9 +106,45 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def _write_text(content: str, path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+
+
+def _write_json(data: Dict[str, Any], path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+
+
+def _check_required_files(base_dir: Path, output: Any) -> Tuple[bool, bool]:
+    """
+    Detect whether main.py and pyproject.toml exist after the Stage 5 run.
+    Checks both on-disk files under base_dir and the agent-emitted paths.
+    """
+    written_paths = set(getattr(output, "written_paths", []) or [])
+    file_block_paths = {getattr(f, "path", "") for f in getattr(output, "files", []) if getattr(f, "path", "")}
+
+    def _has_name(name: str) -> bool:
+        if (base_dir / name).exists():
+            return True
+        for p in written_paths.union(file_block_paths):
+            if Path(p).name == name:
+                return True
+        return False
+
+    has_main = _has_name("main.py")
+    has_pyproject = _has_name("pyproject.toml")
+    return has_main, has_pyproject
+
+
 def main() -> None:
     args = parse_args()
     msg = args.message or input("Enter your request: ").strip()
+
+    write_files = args.write_files or args.stage5
+    effective_output_dir = args.output_dir
+    if args.stage5 and not effective_output_dir:
+        effective_output_dir = str(DEFAULT_STAGE5_OUTPUT_DIR)
 
     overrides: Dict[str, Any] = {
         k: v
@@ -125,8 +195,55 @@ def main() -> None:
         rag_k=args.k,
         max_iterations=args.max_iterations,
         session_name=args.session_name,
+        write_files=write_files,
+        output_dir=effective_output_dir,
     )
-    print(output)
+    print(output.raw_text)
+    if write_files:
+        if output.written_paths:
+            print("\nWritten files:")
+            for p in output.written_paths:
+                print(f"- {p}")
+        else:
+            print("\nNo files were written (agent did not emit file blocks).")
+
+    if args.stage5:
+        base_dir = Path(effective_output_dir) if effective_output_dir else Path(".")
+        raw_output_path = (
+            Path(args.stage5_raw_output).expanduser()
+            if args.stage5_raw_output
+            else base_dir / "agent_output.md"
+        )
+        report_path = (
+            Path(args.stage5_report).expanduser()
+            if args.stage5_report
+            else base_dir / "stage5_report.json"
+        )
+        has_main, has_pyproject = _check_required_files(base_dir, output)
+        _write_text(output.raw_text, raw_output_path)
+        _write_json(
+            {
+                "query": msg,
+                "used_local_docs": output.used_rag,
+                "used_web_search": output.used_web,
+                "file_blocks": len(output.files),
+                "written_paths": output.written_paths,
+                "has_main_py": has_main,
+                "has_pyproject_toml": has_pyproject,
+            },
+            report_path,
+        )
+
+        print("\n--- Stage 5 summary ---")
+        print(f"Local docs searched: {'yes' if output.used_rag else 'no'}")
+        print(f"Web searched: {'yes' if output.used_web else 'no'}")
+        print(f"main.py generated: {'yes' if has_main else 'no'}")
+        print(f"pyproject.toml generated: {'yes' if has_pyproject else 'no'}")
+        print(f"Raw output saved to: {raw_output_path}")
+        print(f"Report saved to: {report_path}")
+
+        if args.fail_on_missing_search and (not output.used_rag or not output.used_web):
+            raise SystemExit("Agent did not call both search_knowledge_base and search_web.")
 
 
 if __name__ == "__main__":

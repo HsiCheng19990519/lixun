@@ -46,7 +46,13 @@ async def search_web(
     return await call_tavily(query, max_results, search_depth)
 
 
-if __name__ == "__main__":
+def main() -> None:
+    """
+    Entry point to start the MCP server (stdio/SSE/streamable-http decided by env).
+    """
     logger.info("Starting MCP server transport=%s host=%s port=%s ...", mcp_transport, host, port)
-    # Officially recommended entrypoint: let FastMCP run the server.
     mcp.run(transport=mcp_transport)
+
+
+if __name__ == "__main__":
+    main()

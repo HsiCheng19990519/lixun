@@ -1,9 +1,8 @@
-# DevMate（Stage 1-3）
-
-本分支覆盖 Stage 1（环境/依赖/配置基线）、Stage 2（MCP 搜索工具）、Stage 3（本地 RAG）与 Stage 4（Agent 工具编排）。后续 Docker/完整观测性未实现。
+# DevMate（Stage 1-5）  
+本分支覆盖 Stage 1（环境/依赖/配置基线）、Stage 2（MCP 搜索工具）、Stage 3（本地 RAG）、Stage 4（Agent 编排），并假定 Stage 5 已完成（徒步路线网站场景，自动写文件与报告）。  
 
 ## 已完成
-- Stage 1：`uv` 管理 Python 3.13；`pyproject.toml` 声明 LangChain 1.x、langchain-chroma、ChatDeepSeek/HF 等依赖；`devmate/config.py::Settings` 统一读取（env > .env > config.toml），敏感文件忽略已处理。
+- Stage 1：`uv` 管理 Python 3.13；`pyproject.toml` 声明 LangChain 1.x、langchain-chroma、ChatDeepSeek/HF 等依赖；`devmate/config.py::Settings` 统一读取（env > .env > config.toml），敏感文件忽略已处理。  
 - Stage 2：MCP 搜索（FastMCP，集成 Tavily）  
   - 服务器：`mcp_server/main.py` 暴露 `search_web`，支持 `stdio` / `sse` / `streamable-http`（默认 stdio，可用 `MCP_TRANSPORT` 切换），需 `TAVILY_API_KEY`。  
   - 客户端：`devmate/mcp_client/client.py`、`scripts/test_mcp_client.py` 默认 stdio，可切换 SSE/HTTP。  
@@ -11,11 +10,12 @@
 - Stage 3：RAG  
   - 文档：`docs/internal_guidelines.md`、`docs/templates.md`、`docs/internal_fastapi_guidelines.md`。  
   - 向量库：`devmate/rag/ingest.py`（langchain-chroma + BAAI/bge-m3，持久化 `data/vector_store`，遥测关闭）。  
-  - 检索：`devmate/rag/retriever.py::search_knowledge_base`，脚本 `scripts/test_rag.py` 可验证。
+  - 检索：`devmate/rag/retriever.py::search_knowledge_base`，脚本 `scripts/test_rag.py` 可验证。  
 - Stage 4：Agent（工具编排）  
   - 核心：`devmate/agent/core.py`，系统提示强制先查本地（RAG）再查网络（MCP），三段式输出（Plan/Findings/Files）。  
-  - 工具：`devmate/agent/tools.py` 包装 `search_knowledge_base` + `search_web`，校验 `search_depth` 非法值回退为 `basic`。  
-  - 入口：`main.py` / `devmate/cli.py` 支持命令行参数覆盖模型、transport、超时等；`observability.py` 可开启 LangSmith（需配置环境变量）。
+  - 工具：`devmate/agent/tools.py` 包装 `search_knowledge_base` + `search_web`，校验 `search_depth` 非法值回退到 `basic`。  
+  - 入口：`main.py` / `devmate/cli.py` 支持命令行参数覆盖模型、transport、超时等；`observability.py` 可开启 LangSmith（需配置环境变量）。  
+- Stage 5：徒步路线网站场景，`--stage5` 默认徒步提示，自动写文件到 `data/stage5_output/`，生成 `agent_output.md` 与 `stage5_report.json`，并检查是否调用本地/网络搜索及是否生成 `main.py`/`pyproject.toml`。系统提示要求包含文件代码块、入口与示例运行命令。  
 
 ## 快速开始
 1) 安装依赖  
@@ -26,7 +26,7 @@ uv sync
 2) 配置变量  
 - Tavily：`TAVILY_API_KEY`  
 - LLM/Embedding：`MODEL_NAME`、`EMBEDDING_MODEL_NAME`，闭源时 `AI_BASE_URL`、`API_KEY`  
-- RAG：`VECTOR_STORE_DIR`、`CHUNK_SIZE`、`CHUNK_OVERLAP`（可选）
+- RAG：`VECTOR_STORE_DIR`、`CHUNK_SIZE`、`CHUNK_OVERLAP`（可选）  
 
 3) 最小环境验证（仅实例化，不发请求）  
 ```
@@ -69,7 +69,7 @@ uv run python scripts/test_rag.py --query "project guidelines"
 
 8) 运行 Agent（Stage 4 演示）  
 ```
-uv run python main.py --message "我想构建一个展示附近徒步路线的网站项目" --transport stdio --k 4 \
+uv run python legacy_main.py --message "我想构建一个展示附近徒步路线的网站项目" --transport stdio --k 4 \
   --provider ollama --model qwen2.5:14b-instruct --ai-base-url http://127.0.0.1:11434/v1
 ```
 - 可用 `--transport http --mcp-http-url http://127.0.0.1:8010/mcp` 切换 HTTP；需要有效 `TAVILY_API_KEY`。  
@@ -80,29 +80,41 @@ uv run python main.py --message "我想构建一个展示附近徒步路线的�
 ...（规划要点）
 
 ### 找到资料
-- 本地文档：internal_guidelines.md / templates.md 等摘要
-- 网络搜索：若 Tavily 200，则列出标题+URL 摘要；若失败，会注明。
+- 本地文档：internal_guidelines.md / templates.md 等摘录
+- 网络搜索：若 Tavily 200，则列出标题+URL 摘要；若失败，会注明
 
 ### 文件
 - 列出建议生成/修改的文件与示例代码块
 ```
 
-## 文件速览
-- `pyproject.toml`：LangChain 1.x、langchain-chroma、langchain-deepseek、langchain-huggingface、sentence-transformers 等依赖；脚本入口。
-- `.env` / `config.toml`：LLM/Embedding/Tavily 配置示例。
-- `devmate/config.py`：配置加载逻辑（env 优先，忽略未知字段，支持大写别名）。
-- `devmate/llm.py`：ChatOpenAI/ChatDeepSeek、OpenAI/HuggingFace Embeddings 工厂。
-- `devmate/logging_utils.py`：stderr + 滚动日志。
-- `mcp_server/main.py`、`mcp_server/tools.py`：MCP server + Tavily 搜索。
-- `devmate/mcp_client/client.py`、`scripts/test_mcp_client.py`：MCP 客户端与测试脚本。
-- `devmate/rag/ingest.py`、`devmate/rag/retriever.py`、`scripts/ingest_docs.py`、`scripts/test_rag.py`：RAG 摄入与检索。
-- `docs/*`：本地知识库示例文档。
+9) 运行 Agent（Stage 5 检测示例，自动写文件+报告）  
+- 闭源模型（DashScope OpenAI 兼容，如 qwen3-max）：  
+```
+uv run python main.py --stage5 --transport stdio --k 6 --max-iterations 8 \
+  --llm-mode closed_source --provider openai \
+  --model qwen3-max \
+```
+- 开源/本地模型（Ollama 示例）：  
+```
+uv run python main.py --stage5 --transport stdio --k 6 --max-iterations 8 \
+  --llm-mode open_source --provider ollama \
+  --model qwen2.5:14b-instruct \
+  --ai-base-url http://127.0.0.1:11434/v1
+```
+预期输出：写入 `data/stage5_output/`（至少包含 `main.py`、`pyproject.toml`、`.env.example` 等），并生成 `agent_output.md` / `stage5_report.json`。`stage5_report.json` 中应包含 `used_local_docs=true`、`used_web_search=true`，以及 `has_main_py=true`、`has_pyproject_toml=true` 的检查结果。  
 
-## 限制
-- 仅涵盖 Stage 1-4；Docker/完整观测链路未提供。  
-- Windows 环境下 stdio 可用；SSE/HTTP 需对应 transport/端口。  
-- 必须设置 `TAVILY_API_KEY` 才能获得真实搜索结果。  
+## 文件速览
+- `pyproject.toml`：LangChain 1.x、langchain-chroma、langchain-deepseek、langchain-huggingface、sentence-transformers 等依赖；脚本入口。  
+- `.env` / `config.toml`：LLM/Embedding/Tavily 配置示例。  
+- `devmate/config.py`：配置加载逻辑（env 优先，忽略未知字段，支持大写别名）。  
+- `devmate/llm.py`：ChatOpenAI/ChatDeepSeek、OpenAI/HuggingFace Embeddings 工厂。  
+- `devmate/logging_utils.py`：stderr + 滚动日志。  
+- `mcp_server/main.py`、`mcp_server/tools.py`：MCP server + Tavily 搜索。  
+- `devmate/mcp_client/client.py`、`scripts/test_mcp_client.py`：MCP 客户端与测试脚本。  
+- `devmate/rag/ingest.py`、`devmate/rag/retriever.py`、`scripts/ingest_docs.py`、`scripts/test_rag.py`：RAG 摄入与检索。  
+- `docs/*`：本地知识库示例文档。  
 
 ## 问题解决记录
 1) MCP 客户端 stdio 初始化超时：客户端侧使用 `async with ClientSession(...)` 包裹会话，避免 `session.initialize()` 卡死。参考讨论 https://stackoverflow.com/questions/79692462/fastmcp-client-timing-out-while-initializing-the-session。  
-2) 网络搜索工具 400（search_depth 非法）：Agent 曾传 `search_depth=medium` 触发 Tavily 400。现工具侧校验并回退为 `basic`（Tavily 仅接受 basic/advanced，参见 https://docs.tavily.com/documentation/api-reference/endpoint/search）。 
+2) 网络搜索工具 400（search_depth 非法）：Agent 曾传 `search_depth=medium` 触发 Tavily 400。现工具侧校验并回退为 `basic`（Tavily 仅接受 basic/advanced，参见 https://docs.tavily.com/documentation/api-reference/endpoint/search）。
+3) 模型不生成 `pyproject.toml`：在系统提示词中明确要求交付物必须包含 `main.py`（入口，含 `main()`）和 `pyproject.toml`（Python 3.13，uv/LangChain 依赖可配置）。
