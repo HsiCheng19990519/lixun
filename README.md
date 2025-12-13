@@ -49,7 +49,7 @@ uv run python -m mcp_server.main
 
 5) 测试 MCP 客户端（默认 stdio）  
 ```
-uv run python scripts/test_mcp_client.py --query "model context protocol"
+uv run python -m scripts.test_mcp_client --query "model context protocol"
 ```
 - HTTP：`--transport http --http-url http://127.0.0.1:8010/mcp`  
 - SSE：`--transport sse`（需 server 以 sse 启动）  
@@ -57,9 +57,9 @@ uv run python scripts/test_mcp_client.py --query "model context protocol"
 
 6) 文档摄入（Stage 3）  
 ```
-uv run python scripts/ingest_docs.py --rebuild
+uv run python -m scripts.ingest_docs --rebuild
 ```
-说明：读取 `docs/`，切分并写入 `data/vector_store`（遥测已禁用）。
+说明：读取 `docs/`，切分并写入 `data/vector_store`（遥测已禁用）；如果速度过慢，可以先将 `HF_ENDPOINT` 设为 `https://hf-mirror.com`。
 
 7) 知识库查询（Stage 3 验证）  
 ```

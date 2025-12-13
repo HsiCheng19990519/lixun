@@ -14,6 +14,7 @@ devmate.egg-info/requires.txt
 devmate.egg-info/top_level.txt
 devmate/agent/__init__.py
 devmate/agent/core.py
+devmate/agent/run_state.py
 devmate/agent/tools.py
 devmate/mcp_client/__init__.py
 devmate/mcp_client/client.py
