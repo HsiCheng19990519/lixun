@@ -16,7 +16,7 @@
    - When generating multiple files, present file path + content blocks.  
    - All model names/API keys/URLs must be configurable via env or config files; never hard-code.  
    - Default to Python 3.13 and LangChain 1.x.  
-   - Always generate `main.py` as the entrypoint (with `main()`) and provide `pyproject.toml` (Python 3.13; dependencies managed via uv/configurable settings).
+   - Always generate `main.py` as the entrypoint and provide `pyproject.toml` (Python 3.13; dependencies managed via uv/configurable settings).
 
 5) Observability  
    - If LangSmith/LangFuse is available, enable it to log tool calls and prompts.

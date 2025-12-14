@@ -61,7 +61,7 @@ uv run python -m scripts.test_mcp_client --query "model context protocol"
 ```
 uv run python -m scripts.ingest_docs --rebuild
 ```
-说明：读取 `docs/`，切分并写入 `data/vector_store`（遥测已禁用）；如果速度过慢，可以先将 `HF_ENDPOINT` 设为 `https://hf-mirror.com`。
+说明：读取 `docs/`，切分并写入 `data/vector_store`（遥测已禁用）；首次会将 `BAAI/bge-m3` 下载并缓存到 `data/hf_cache`（可用 `EMBEDDING_CACHE_DIR` 覆盖；同时会自动设置 `HF_HOME`/`TRANSFORMERS_CACHE`/`HUGGINGFACE_HUB_CACHE` 指向该目录），后续复用；如果速度过慢，可以先将 `HF_ENDPOINT` 设为 `https://hf-mirror.com`。
 
 7) 知识库查询（Stage 3 验证）  
 ```

@@ -41,9 +41,9 @@ class Settings(BaseSettings):
     )
 
     # ---------- LLM ----------
-    llm_mode: str = "open_source"  # open_source | closed_source
-    llm_provider: str = "ollama"   # ollama | openai | deepseek | qwen_api
-    model_name: str = "qwen2.5-coder:7b"
+    llm_mode: str = "closed_source"  # open_source | closed_source
+    llm_provider: str = "zhipu"   # ollama | openai | deepseek | qwen_api | zhipu
+    model_name: str = "glm-4.6"
     ai_base_url: Optional[str] = None
     api_key: Optional[str] = None
 
@@ -54,6 +54,7 @@ class Settings(BaseSettings):
     embedding_device: str = "cpu"
     embedding_base_url: Optional[str] = None
     embedding_api_key: Optional[str] = None
+    embedding_cache_dir: str = "data/hf_cache"
 
     # ---------- RAG / splitting ----------
     vector_store_dir: str = "data/vector_store"

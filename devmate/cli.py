@@ -66,7 +66,7 @@ def parse_args() -> argparse.Namespace:
 
     # LLM
     parser.add_argument("--llm-mode", dest="llm_mode", default=None, help="LLM mode (open_source/closed_source)")
-    parser.add_argument("--provider", dest="llm_provider", default=None, help="LLM provider (ollama/openai/deepseek/qwen_api/...)")
+    parser.add_argument("--provider", dest="llm_provider", default=None, help="LLM provider (ollama/openai/deepseek/qwen_api/zhipu/...)")
     parser.add_argument("--model", dest="model_name", default=None, help="LLM model name")
     parser.add_argument("--ai-base-url", dest="ai_base_url", default=None, help="AI_BASE_URL for OpenAI-compatible endpoints")
     parser.add_argument("--api-key", dest="api_key", default=None, help="API key for LLM provider")
