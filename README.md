@@ -1,5 +1,5 @@
-# DevMate（Stage 1-5）  
-本分支覆盖 Stage 1（环境/依赖/配置基线）、Stage 2（MCP 搜索工具）、Stage 3（本地 RAG）、Stage 4（Agent 编排），并假定 Stage 5 已完成（徒步路线网站场景，自动写文件与报告）。  
+# DevMate（Stage 1-6）  
+本分支覆盖 Stage 1（环境/依赖/配置基线）、Stage 2（MCP 搜索工具）、Stage 3（本地 RAG）、Stage 4（Agent 编排），Stage 5（徒步路线网站场景，自动写文件与报告），并新增 Stage 6（容器化与 Compose 运行 DevMate）。  
 
 ## 已完成
 - Stage 1：`uv` 管理 Python 3.13；`pyproject.toml` 声明 LangChain 1.x、langchain-chroma、ChatDeepSeek/HF 等依赖；`devmate/config.py::Settings` 统一读取（env > .env > config.toml），敏感文件忽略已处理。  
@@ -16,6 +16,7 @@
   - 工具：`devmate/agent/tools.py` 包装 `search_knowledge_base` + `search_web`，校验 `search_depth` 非法值回退到 `basic`。  
   - 入口：`main.py` / `devmate/cli.py` 支持命令行参数覆盖模型、transport、超时等；`observability.py` 可开启 LangSmith（需配置环境变量）。  
 - Stage 5：徒步路线网站场景，`--stage5` 默认徒步提示，自动写文件到 `data/stage5_output/`，生成 `agent_output.md` 与 `stage5_report.json`，并检查是否调用本地/网络搜索及是否生成 `main.py`/`pyproject.toml`。系统提示要求包含文件代码块、入口与示例运行命令。  
+- Stage 6：容器化（Docker + docker-compose），单镜像复用 app/ingest，外部 Chroma 容器（host/port）+ app 内部 stdio 启动 MCP，支持卷挂载写入输出与日志。  
 
 ## 快速开始
 1) 安装依赖  
