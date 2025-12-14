@@ -15,11 +15,11 @@ from pathlib import Path
 from dataclasses import dataclass
 from typing import List, Optional
 
-from langgraph.prebuilt import create_react_agent
+from langchain.agents import create_agent
 from langchain_core.messages import HumanMessage
 
 from devmate.agent.tools import build_tools
-from devmate.agent.run_state import FLAGS
+from devmate.agent.run_state import AgentRunFlags
 from devmate.config import Settings
 from devmate.llm import build_chat_model
 from devmate.observability import build_tracing_config
@@ -131,16 +131,15 @@ def run_agent(
     """
     cfg = settings or Settings()
     logger.info("Agent starting query=%s", message)
-    FLAGS.used_rag = False
-    FLAGS.used_web = False
+    run_flags = AgentRunFlags()
 
     llm = build_chat_model(cfg)
-    tools = build_tools(cfg, transport=transport, default_k=rag_k)
+    tools = build_tools(cfg, transport=transport, default_k=rag_k, run_flags=run_flags)
 
-    agent = create_react_agent(
-        model=llm,
-        tools=tools,
-        prompt=SYSTEM_PROMPT,
+    agent = create_agent(
+        llm,
+        tools,
+        system_prompt=SYSTEM_PROMPT,
     ).with_config({"recursion_limit": max_iterations})
 
     run_cfg = build_tracing_config(run_name="devmate-agent", session_name=session_name or "default")
@@ -161,7 +160,7 @@ def run_agent(
         query=message,
         raw_text=final_text,
         files=file_results,
-        used_rag=FLAGS.used_rag,
-        used_web=FLAGS.used_web,
+        used_rag=run_flags.used_rag,
+        used_web=run_flags.used_web,
         written_paths=written_paths,
     )

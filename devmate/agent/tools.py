@@ -17,7 +17,7 @@ from langchain.tools import tool
 from devmate.config import Settings
 from devmate.rag.retriever import search_knowledge_base
 from devmate.mcp_client.client import call_search_web_sync
-from devmate.agent.run_state import FLAGS
+from devmate.agent.run_state import AgentRunFlags
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +48,7 @@ def build_tools(
     transport: Optional[str] = None,
     http_url: Optional[str] = None,
     default_k: int = 4,
+    run_flags: Optional[AgentRunFlags] = None,
 ):
     """
     Return a list of LangChain tools for the agent.
@@ -63,7 +64,8 @@ def build_tools(
         """
         try:
             logger.info("Tool search_knowledge_base called query=%s k=%s", query, k)
-            FLAGS.used_rag = True
+            if run_flags:
+                run_flags.used_rag = True
             result = search_knowledge_base(
                 query=query,
                 settings=cfg,
@@ -95,7 +97,8 @@ def build_tools(
                 resolved_transport,
                 resolved_http_url,
             )
-            FLAGS.used_web = True
+            if run_flags:
+                run_flags.used_web = True
             result = call_search_web_sync(
                 query=query,
                 max_results=max_results,
