@@ -142,6 +142,6 @@ docker compose -f docker/docker-compose.yml run --rm \
 - `docker/Dockerfile`、`docker/docker-compose.yml`：Stage 6 容器化与编排（app + Chroma，MCP 以 stdio 方式由 app 内部拉起），默认使用 Chroma host/port 连接。  
 - `docs/*`：本地知识库示例文档。  
 
-## 问题解决记录
+## 部分问题解决记录
 1) MCP 客户端 stdio 初始化超时：客户端侧使用 `async with ClientSession(...)` 包裹会话，避免 `session.initialize()` 卡死。参考讨论 https://stackoverflow.com/questions/79692462/fastmcp-client-timing-out-while-initializing-the-session。  
 2) 网络搜索工具 400（search_depth 非法）：Agent 曾传 `search_depth=medium` 触发 Tavily 400。现工具侧校验并回退为 `basic`（Tavily 仅接受 basic/advanced，参见 https://docs.tavily.com/documentation/api-reference/endpoint/search）。
