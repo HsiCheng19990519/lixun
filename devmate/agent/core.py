@@ -15,7 +15,7 @@ from pathlib import Path
 from dataclasses import dataclass
 from typing import List, Optional
 
-from langgraph.prebuilt import create_react_agent
+from langchain.agents import create_agent
 from langchain_core.messages import HumanMessage
 
 from devmate.agent.tools import build_tools
@@ -137,10 +137,10 @@ def run_agent(
     llm = build_chat_model(cfg)
     tools = build_tools(cfg, transport=transport, default_k=rag_k)
 
-    agent = create_react_agent(
-        model=llm,
-        tools=tools,
-        prompt=SYSTEM_PROMPT,
+    agent = create_agent(
+        llm,
+        tools,
+        system_prompt=SYSTEM_PROMPT,
     ).with_config({"recursion_limit": max_iterations})
 
     run_cfg = build_tracing_config(run_name="devmate-agent", session_name=session_name or "default")
