@@ -1,5 +1,5 @@
 # DevMate  
-本分支已完成阶段性目标：Stage 1（环境/依赖/配置基线）、Stage 2（MCP 搜索工具）、Stage 3（本地 RAG）、Stage 4（Agent 编排）、Stage 5（徒步路线网站场景，自动写文件与报告）、Stage 6（容器化与 Compose 运行 DevMate），以及 Stage 7 & 8（代码审查、文档与交付）。  
+本分支已完成所有阶段性目标：Stage 1（环境/依赖/配置基线）、Stage 2（MCP 搜索工具）、Stage 3（本地 RAG）、Stage 4（Agent 编排）、Stage 5（徒步路线网站场景，自动写文件与报告）、Stage 6（容器化与 Compose 运行 DevMate），以及 Stage 7 & 8（代码审查、文档与交付）。  
 
 ## 已完成
 - Stage 1：`uv` 管理 Python 3.13；`pyproject.toml` 声明 LangChain 1.x、langchain-chroma、ChatDeepSeek/HF 等依赖；`devmate/config.py::Settings` 统一读取（env > .env > config.toml），敏感文件忽略已处理。  
