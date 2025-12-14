@@ -60,6 +60,9 @@ class Settings(BaseSettings):
     chunk_strategy: str = "recursive"
     chunk_size: int = 1000
     chunk_overlap: int = 200
+    chroma_host: str = "127.0.0.1"
+    chroma_http_port: int = 8000
+    chroma_ssl: bool = False
 
     # ---------- Web search ----------
     tavily_api_key: Optional[str] = None

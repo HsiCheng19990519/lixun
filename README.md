@@ -103,6 +103,31 @@ uv run python main.py --stage5 --transport stdio --k 6 --max-iterations 8 \
 ```
 预期输出：写入 `data/stage5_output/`（至少包含 `main.py`、`pyproject.toml`、`.env.example` 等），并生成 `agent_output.md` / `stage5_report.json`。`stage5_report.json` 中应包含 `used_local_docs=true`、`used_web_search=true`，以及 `has_main_py=true`、`has_pyproject_toml=true` 的检查结果。  
 
+10) Docker 与 Compose（运行 DevMate 本身）
+- 构建镜像（基于项目根目录）：  
+```
+docker compose -f docker/docker-compose.yml build
+```
+- 启动依赖（仅 Chroma，MCP 由 app 进程以 stdio 自行拉起）：  
+```
+docker compose -f docker/docker-compose.yml up -d vector-db
+```
+- 构建/刷新向量库（HTTP 模式写入远程 Chroma 服务）：  
+```
+docker compose -f docker/docker-compose.yml run --rm ingest
+```
+- 运行 Agent（Stage5 默认徒步提示，使用容器内 venv 的 Python）：  
+```
+docker compose -f docker/docker-compose.yml run --rm \
+  -e MCP_TRANSPORT=stdio \
+  app \
+  /app/.venv/bin/python -m devmate.cli \
+  --stage5 --transport stdio \
+  --k 6 --max-iterations 8 \
+  --llm-mode closed_source --provider openai --model qwen3-max \
+  --write-files --output-dir /app/data/stage5_output
+```
+
 ## 文件速览
 - `pyproject.toml`：LangChain 1.x、langchain-chroma、langchain-deepseek、langchain-huggingface、sentence-transformers 等依赖；脚本入口。  
 - `.env` / `config.toml`：LLM/Embedding/Tavily 配置示例。  
@@ -111,7 +136,8 @@ uv run python main.py --stage5 --transport stdio --k 6 --max-iterations 8 \
 - `devmate/logging_utils.py`：stderr + 滚动日志。  
 - `mcp_server/main.py`、`mcp_server/tools.py`：MCP server + Tavily 搜索。  
 - `devmate/mcp_client/client.py`、`scripts/test_mcp_client.py`：MCP 客户端与测试脚本。  
-- `devmate/rag/ingest.py`、`devmate/rag/retriever.py`、`scripts/ingest_docs.py`、`scripts/test_rag.py`：RAG 摄入与检索。  
+- `devmate/rag/ingest.py`、`devmate/rag/retriever.py`、`scripts/ingest_docs.py`、`scripts/test_rag.py`：RAG 摄入与检索（Chroma 支持本地持久化或 host/port 远程模式）。  
+- `docker/Dockerfile`、`docker/docker-compose.yml`：Stage 6 容器化与编排（app + Chroma，MCP 以 stdio 方式由 app 内部拉起），默认使用 Chroma host/port 连接。  
 - `docs/*`：本地知识库示例文档。  
 
 ## 问题解决记录

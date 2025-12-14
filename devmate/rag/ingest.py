@@ -20,7 +20,7 @@ os.environ.setdefault("ANONYMIZED_TELEMETRY", "false")
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
-from chromadb.config import Settings as ChromaSettings
+from chromadb import HttpClient
 
 from devmate.config import Settings
 from devmate.llm import build_embedding_model
@@ -70,6 +70,7 @@ def ingest_documents(
     """
     docs_path = docs_dir or Path("docs")
     persist_path = persist_dir or Path(settings.vector_store_dir)
+    use_http = bool(settings.chroma_host)
 
     setup_logging(settings)
     logger.info("Starting ingestion docs_dir=%s persist_dir=%s rebuild=%s", docs_path, persist_path, rebuild)
@@ -85,22 +86,38 @@ def ingest_documents(
     for idx, doc in enumerate(chunks):
         doc.metadata["chunk_id"] = idx
 
-    if rebuild and persist_path.exists():
-        shutil.rmtree(persist_path)
-        logger.info("Removed existing vector store at %s", persist_path)
+    client: HttpClient | None = None
+    persist_directory: str | None = None
 
-    persist_path.mkdir(parents=True, exist_ok=True)
+    if use_http:
+        client = HttpClient(
+            host=settings.chroma_host,
+            port=settings.chroma_http_port,
+            ssl=settings.chroma_ssl,
+        )
+        if rebuild and getattr(client, "reset", None):
+            try:
+                client.reset()  # type: ignore[attr-defined]
+                logger.info("Reset Chroma collection via HTTP client (server must allow reset)")
+            except Exception as exc:  # pragma: no cover - best-effort cleanup
+                logger.warning("Unable to reset Chroma collection via HTTP: %s", exc)
+    else:
+        if rebuild and persist_path.exists():
+            shutil.rmtree(persist_path)
+            logger.info("Removed existing vector store at %s", persist_path)
+        persist_path.mkdir(parents=True, exist_ok=True)
+        persist_directory = str(persist_path)
 
     embedding = build_embedding_model(settings)
     Chroma.from_documents(
         documents=chunks,
         embedding=embedding,
         collection_name=COLLECTION_NAME,
-        persist_directory=str(persist_path),
-        client_settings=ChromaSettings(
-            anonymized_telemetry=False,
-            persist_directory=str(persist_path),
-        ),
+        persist_directory=persist_directory,
+        client=client,
+        host=settings.chroma_host if use_http else None,
+        port=settings.chroma_http_port if use_http else None,
+        ssl=settings.chroma_ssl if use_http else None,
     )
 
     logger.info("Ingestion completed: %s documents -> %s chunks", len(raw_docs), len(chunks))

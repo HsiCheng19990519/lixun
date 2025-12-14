@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from langchain_chroma import Chroma
-from chromadb.config import Settings as ChromaSettings
+from chromadb import HttpClient
 
 from devmate.config import Settings
 from devmate.llm import build_embedding_model
@@ -24,19 +24,26 @@ COLLECTION_NAME = "devmate-docs"
 
 def _load_store(settings: Settings, persist_dir: Optional[Path] = None) -> Chroma:
     store_path = persist_dir or Path(settings.vector_store_dir)
-    if not store_path.exists():
+    use_http = bool(settings.chroma_host)
+    if not use_http and not store_path.exists():
         raise FileNotFoundError(
             f"Vector store not found at {store_path}. Run scripts/ingest_docs.py first."
         )
     embedding = build_embedding_model(settings)
+    client = HttpClient(
+        host=settings.chroma_host,
+        port=settings.chroma_http_port,
+        ssl=settings.chroma_ssl,
+    ) if use_http else None
+    persist_directory = None if use_http else str(store_path)
     return Chroma(
-        persist_directory=str(store_path),
         embedding_function=embedding,
         collection_name=COLLECTION_NAME,
-        client_settings=ChromaSettings(
-            anonymized_telemetry=False,
-            persist_directory=str(store_path),
-        ),
+        persist_directory=persist_directory,
+        client=client,
+        host=settings.chroma_host if use_http else None,
+        port=settings.chroma_http_port if use_http else None,
+        ssl=settings.chroma_ssl if use_http else None,
     )
 
 

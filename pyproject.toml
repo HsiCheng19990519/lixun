@@ -23,6 +23,7 @@ dependencies = [
   "langchain-huggingface>=0.1.0",
   "sentence-transformers>=2.2.2",
   "modelcontextprotocol>=0.1.0",
+  "langgraph>=1.0.0",
 ]
 
 [project.scripts]
