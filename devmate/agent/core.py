@@ -59,7 +59,8 @@ Follow this workflow strictly:
 ```<language>
 <content>
 ```
-5) Do not dump raw tool JSON; summarize key points. If a tool returns an error, continue with available info and note the failure.
+5) When generating code, always generate `main.py` as the entrypoint and provide `pyproject.toml` (Python 3.13; dependencies managed via uv/configurable settings).
+6) Do not dump raw tool JSON; summarize key points. If a tool returns an error, continue with available info and note the failure.
 Final answer MUST have three sections:
 - Plan
 - Findings (local docs / web, with sources)

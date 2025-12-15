@@ -23,6 +23,16 @@ logger = logging.getLogger(__name__)
 ZHIPU_DEFAULT_BASE_URL = "https://open.bigmodel.cn/api/paas/v4"
 
 
+def _configure_zhipu_network_defaults() -> None:
+    """
+    Set safer defaults for the OpenAI client when calling Zhipu to reduce HTTP/2 disconnects.
+    Values are only applied if the user has not provided overrides.
+    """
+    os.environ.setdefault("OPENAI_HTTP2", "0")
+    os.environ.setdefault("OPENAI_MAX_RETRIES", "5")
+    os.environ.setdefault("OPENAI_TIMEOUT", "120")
+
+
 def _build_common_params(settings: Settings) -> Dict[str, Any]:
     params: Dict[str, Any] = {
         "model": settings.model_name,
@@ -81,20 +91,21 @@ def build_chat_model(settings: Settings):
         ChatDeepSeek = _import_chat_deepseek()
         return ChatDeepSeek(**params)
 
-    if provider == "zhipu":
-        if not params.get("api_key"):
-            raise ValueError(
-                "LLM provider 'zhipu' requires API_KEY (Zhipu GLM key). "
-                "Set API_KEY in environment or .env."
-            )
-        if not params.get("base_url"):
-            params["base_url"] = ZHIPU_DEFAULT_BASE_URL
-        logger.info(
-            "Initializing Zhipu GLM ChatOpenAI model=%s base_url=%s",
-            settings.model_name,
-            params.get("base_url"),
-        )
-        return ChatOpenAI(**params)
+    # if provider == "zhipu":
+    #     if not params.get("api_key"):
+    #         raise ValueError(
+    #             "LLM provider 'zhipu' requires API_KEY (Zhipu GLM key). "
+    #             "Set API_KEY in environment or .env."
+    #         )
+    #     if not params.get("base_url"):
+    #         params["base_url"] = ZHIPU_DEFAULT_BASE_URL
+    #     _configure_zhipu_network_defaults()
+    #     logger.info(
+    #         "Initializing Zhipu GLM ChatOpenAI model=%s base_url=%s",
+    #         settings.model_name,
+    #         params.get("base_url"),
+    #     )
+    #     return ChatOpenAI(**params)
 
     if provider == "ollama" and not params.get("base_url"):
         # Provide sensible default for local Ollama (OpenAI-compatible endpoint).

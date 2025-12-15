@@ -94,7 +94,7 @@ uv run python legacy_main.py --message "我想构建一个展示附近徒步路�
 ```
 uv run python main.py --stage5 --transport stdio --k 6 --max-iterations 8 \
   --llm-mode closed_source --provider openai \
-  --model qwen3-max \
+  --model qwen3-max
 ```
 - 开源/本地模型（Ollama 示例）：  
 ```
@@ -118,7 +118,7 @@ docker compose -f docker/docker-compose.yml up -d vector-db
 ```
 docker compose -f docker/docker-compose.yml run --rm ingest
 ```
-- 运行 Agent（Stage5 默认徒步提示，使用容器内 venv 的 Python）：  
+- 运行 Agent（Stage5，使用容器内 venv 的 Python）：  
 ```
 docker compose -f docker/docker-compose.yml run --rm \
   -e MCP_TRANSPORT=stdio \

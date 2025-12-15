@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import sys
 from pathlib import Path
@@ -12,6 +13,8 @@ from mcp.client.sse import sse_client
 
 from devmate.config import Settings
 from devmate.logging_utils import setup_logging
+
+logger = logging.getLogger(__name__)
 
 
 def _default_server_params() -> StdioServerParameters:
@@ -30,12 +33,27 @@ def _default_server_params() -> StdioServerParameters:
     )
 
 
+def _resolve_timeout(timeout_seconds: Optional[float]) -> float:
+    """
+    Choose timeout for MCP calls. Prefers explicit arg, then env override, then fallback.
+    """
+    if timeout_seconds is not None:
+        return timeout_seconds
+    env_val = os.environ.get("MCP_TIMEOUT_SECONDS")
+    if env_val:
+        try:
+            return float(env_val)
+        except ValueError:
+            logger.warning("Invalid MCP_TIMEOUT_SECONDS=%s; falling back to default", env_val)
+    return 240.0
+
+
 async def call_search_web(
     query: str,
     max_results: int = 5,
     search_depth: str = "basic",
     server_params: Optional[StdioServerParameters] = None,
-    timeout_seconds: float = 120.0,
+    timeout_seconds: Optional[float] = None,
     transport: str = "stdio",
     http_url: Optional[str] = None,
 ) -> Dict[str, Any]:
@@ -43,6 +61,8 @@ async def call_search_web(
     Connect to the MCP server over stdio and call search_web tool.
     Returns the raw CallToolResult model_dump() for flexibility.
     """
+    timeout = _resolve_timeout(timeout_seconds)
+
     if transport == "stdio":
         params = server_params or _default_server_params()
         log_path = Path("logs/mcp_server_stderr.log")
@@ -52,7 +72,7 @@ async def call_search_web(
         try:
             async with stdio_client(params, errlog=err_file) as (read_stream, write_stream):
                 async with ClientSession(read_stream, write_stream) as session:
-                    await asyncio.wait_for(session.initialize(), timeout=timeout_seconds)
+                    await asyncio.wait_for(session.initialize(), timeout=timeout)
                     result = await asyncio.wait_for(
                         session.call_tool(
                             "search_web",
@@ -62,7 +82,7 @@ async def call_search_web(
                                 "search_depth": search_depth,
                             },
                         ),
-                        timeout=timeout_seconds,
+                        timeout=timeout,
                     )
                     return result.model_dump()
         finally:
@@ -75,7 +95,7 @@ async def call_search_web(
         url = sse_url
         async with sse_client(url) as (read_stream, write_stream):
             async with ClientSession(read_stream, write_stream) as session:
-                await asyncio.wait_for(session.initialize(), timeout=timeout_seconds)
+                await asyncio.wait_for(session.initialize(), timeout=timeout)
                 result = await asyncio.wait_for(
                     session.call_tool(
                         "search_web",
@@ -85,7 +105,7 @@ async def call_search_web(
                             "search_depth": search_depth,
                         },
                     ),
-                    timeout=timeout_seconds,
+                    timeout=timeout,
                 )
                 return result.model_dump()
 
@@ -95,7 +115,7 @@ async def call_search_web(
 
         async with streamablehttp_client(url) as (read_stream, write_stream, _get_session_id):
             async with ClientSession(read_stream, write_stream) as session:
-                await asyncio.wait_for(session.initialize(), timeout=timeout_seconds)
+                await asyncio.wait_for(session.initialize(), timeout=timeout)
                 result = await asyncio.wait_for(
                     session.call_tool(
                         "search_web",
@@ -105,7 +125,7 @@ async def call_search_web(
                             "search_depth": search_depth,
                         },
                     ),
-                    timeout=timeout_seconds,
+                    timeout=timeout,
                 )
                 return result.model_dump()
 
@@ -128,7 +148,7 @@ def call_search_web_sync(
     search_depth: str = "basic",
     transport: str = "stdio",
     http_url: Optional[str] = None,
-    timeout_seconds: float = 120.0,
+    timeout_seconds: Optional[float] = None,
 ) -> Dict[str, Any]:
     """
     Synchronous wrapper around call_search_web for agent/tool usage.
