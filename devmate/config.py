@@ -64,6 +64,13 @@ class Settings(BaseSettings):
     chroma_host: str = "127.0.0.1"
     chroma_http_port: int = 8000
     chroma_ssl: bool = False
+    rag_distance_keep_threshold: float = Field(default=0.6, alias="DEV_RAG_DISTANCE_KEEP_THRESHOLD")
+    rag_distance_requery_threshold: float = Field(default=0.8, alias="DEV_RAG_DISTANCE_REQUERY_THRESHOLD")
+    rag_max_k: int = Field(default=8, alias="DEV_RAG_MAX_K")
+    rag_multi_hop: bool = Field(default=False, alias="DEV_RAG_MULTI_HOP")
+    rag_max_subqueries: int = Field(default=3, alias="DEV_RAG_MAX_SUBQUERIES")
+    rag_rewrite: bool = Field(default=True, alias="DEV_RAG_REWRITE")
+    rag_rewrite_max_chars: int = Field(default=200, alias="DEV_RAG_REWRITE_MAX_CHARS")
 
     # ---------- Web search ----------
     tavily_api_key: Optional[str] = None

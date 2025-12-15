@@ -89,6 +89,55 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--chunk-strategy", dest="chunk_strategy", default=None, help="Chunk strategy")
     parser.add_argument("--chunk-size", dest="chunk_size", type=int, default=None, help="Chunk size")
     parser.add_argument("--chunk-overlap", dest="chunk_overlap", type=int, default=None, help="Chunk overlap")
+    parser.add_argument(
+        "--rag-distance-keep-threshold",
+        dest="rag_distance_keep_threshold",
+        type=float,
+        default=None,
+        help="Drop results with distance higher than this (lower is better).",
+    )
+    parser.add_argument(
+        "--rag-distance-requery-threshold",
+        dest="rag_distance_requery_threshold",
+        type=float,
+        default=None,
+        help="If best distance is higher than this, re-query with larger k.",
+    )
+    parser.add_argument(
+        "--rag-max-k",
+        dest="rag_max_k",
+        type=int,
+        default=None,
+        help="Upper bound for adaptive k when re-querying.",
+    )
+    parser.add_argument(
+        "--rag-multi-hop",
+        dest="rag_multi_hop",
+        type=_str2bool,
+        default=None,
+        help="Enable multi-hop subqueries for RAG (true/false).",
+    )
+    parser.add_argument(
+        "--rag-max-subqueries",
+        dest="rag_max_subqueries",
+        type=int,
+        default=None,
+        help="Max subqueries to propose when multi-hop is enabled.",
+    )
+    parser.add_argument(
+        "--rag-rewrite",
+        dest="rag_rewrite",
+        type=_str2bool,
+        default=None,
+        help="Enable query rewrite middleware (true/false).",
+    )
+    parser.add_argument(
+        "--rag-rewrite-max-chars",
+        dest="rag_rewrite_max_chars",
+        type=int,
+        default=None,
+        help="Cap length of rewritten query.",
+    )
 
     # Tavily / search
     parser.add_argument("--tavily-api-key", dest="tavily_api_key", default=None, help="Tavily API key")
@@ -172,6 +221,13 @@ def main() -> None:
             "chunk_strategy": args.chunk_strategy,
             "chunk_size": args.chunk_size,
             "chunk_overlap": args.chunk_overlap,
+            "rag_distance_keep_threshold": args.rag_distance_keep_threshold,
+            "rag_distance_requery_threshold": args.rag_distance_requery_threshold,
+            "rag_max_k": args.rag_max_k,
+            "rag_multi_hop": args.rag_multi_hop,
+            "rag_max_subqueries": args.rag_max_subqueries,
+            "rag_rewrite": args.rag_rewrite,
+            "rag_rewrite_max_chars": args.rag_rewrite_max_chars,
             # Tavily
             "tavily_api_key": args.tavily_api_key,
             # Observability

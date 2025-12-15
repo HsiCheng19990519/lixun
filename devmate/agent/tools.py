@@ -9,7 +9,6 @@ Exposes:
 """
 
 import logging
-import os
 from typing import Any, Dict, List, Optional, Tuple
 
 from langchain.tools import tool
@@ -49,6 +48,7 @@ def build_tools(
     http_url: Optional[str] = None,
     default_k: int = 4,
     run_flags: Optional[AgentRunFlags] = None,
+    llm: Any = None,
 ):
     """
     Return a list of LangChain tools for the agent.
@@ -57,14 +57,47 @@ def build_tools(
     - DEV_RAG_DISTANCE_KEEP_THRESHOLD: drop results with distance higher than this (default 0.6).
     - DEV_RAG_DISTANCE_REQUERY_THRESHOLD: if best distance is higher, re-query with larger k (default 0.8).
     - DEV_RAG_MAX_K: upper bound for adaptive k (default 8).
+    - DEV_RAG_MULTI_HOP: if true, generate subqueries and run multi-hop retrieval (default false).
+    - DEV_RAG_MAX_SUBQUERIES: cap number of subqueries when multi-hop (default 3).
     """
     cfg = settings or Settings()
     resolved_transport = _resolve_transport(transport, cfg)
     resolved_http_url = _resolve_http_url(http_url, cfg)
-    # Adaptive knobs (env-tunable to avoid config churn).
-    distance_keep_threshold = float(os.getenv("DEV_RAG_DISTANCE_KEEP_THRESHOLD", "0.6"))  # lower is better
-    distance_requery_threshold = float(os.getenv("DEV_RAG_DISTANCE_REQUERY_THRESHOLD", "0.8"))
-    max_adaptive_k = int(os.getenv("DEV_RAG_MAX_K", "8"))
+    distance_keep_threshold = cfg.rag_distance_keep_threshold  # lower is better
+    distance_requery_threshold = cfg.rag_distance_requery_threshold
+    max_adaptive_k = cfg.rag_max_k
+    multi_hop_enabled = cfg.rag_multi_hop
+    max_subqueries = cfg.rag_max_subqueries
+
+    def _propose_subqueries(query: str) -> List[str]:
+        """
+        Use the LLM to generate subqueries for multi-hop retrieval.
+        Fallback to the original query on errors or empty outputs.
+        """
+        if not (multi_hop_enabled and llm):
+            return [query]
+        try:
+            prompt = (
+                "Given a user goal, propose up to "
+                f"{max_subqueries} concise retrieval queries (one per line). "
+                "Prefer multiple complementary subqueries when the task has several parts "
+                "(e.g., APIs to use, frontend framework, deployment). "
+                "Keep key entities/APIs/locations. If everything fits one query, return just one line."
+            )
+            resp = llm.invoke([{"role": "system", "content": prompt}, {"role": "user", "content": query}])
+            content = getattr(resp, "content", resp)
+            text = "\n".join(content) if isinstance(content, list) else str(content)
+            candidates = [line.strip(" -•\t") for line in text.splitlines() if line.strip()]
+            deduped: List[str] = []
+            for cand in candidates:
+                if cand and cand not in deduped:
+                    deduped.append(cand)
+                if len(deduped) >= max_subqueries:
+                    break
+            return deduped or [query]
+        except Exception as exc:
+            logger.warning("subquery proposal failed; using original query. err=%s", exc)
+            return [query]
 
     def _filter_by_score(
         results: List[Dict[str, Any]],
@@ -94,59 +127,79 @@ def build_tools(
         Content is sent to the model; artifacts carry raw Documents with metadata+scores.
         """
         try:
-            logger.info("Tool search_knowledge_base called query=%s k=%s", query, k)
+            subqueries = _propose_subqueries(query)
+            logger.info(
+                "Tool search_knowledge_base called query=%s k=%s subqueries=%s",
+                query,
+                k,
+                subqueries,
+            )
             if run_flags:
                 run_flags.used_rag = True
-            notes: List[str] = [f"[RAG] initial k={k}"]
-            # First pass
-            result, documents = search_knowledge_base(
-                query=query,
-                settings=cfg,
-                persist_dir=None,
-                k=k,
-                return_documents=True,
-            )
-            best_score = result["results"][0]["score"] if result.get("results") else None
-            # If top score looks weak (distance too high) and we can fetch more, retry with larger k.
-            needs_more = (best_score is None) or (best_score > distance_requery_threshold)
-            if needs_more and k < max_adaptive_k:
-                boosted_k = min(max_adaptive_k, max(k * 2, k + 2))
-                logger.info(
-                    "Top score %s exceeds requery threshold %s; boosting k to %s",
-                    best_score,
-                    distance_requery_threshold,
-                    boosted_k,
-                )
-                notes.append(
-                    f"[RAG] boosted k from {k} to {boosted_k} (best_score={best_score})"
-                )
-                boosted_result, boosted_docs = search_knowledge_base(
-                    query=query,
+            hop_serialized: List[str] = []
+            all_docs: List[Any] = []
+
+            for hop_idx, subquery in enumerate(subqueries, start=1):
+                notes: List[str] = [f"[RAG] hop {hop_idx}/{len(subqueries)} | query={subquery} | initial k={k}"]
+                result, documents = search_knowledge_base(
+                    query=subquery,
                     settings=cfg,
                     persist_dir=None,
-                    k=boosted_k,
+                    k=k,
                     return_documents=True,
                 )
-                # Merge, keeping order from boosted_result (already top-sorted).
-                result, documents = boosted_result, boosted_docs
-                k = boosted_k  # reflect the effective k used
+                best_score = result["results"][0]["score"] if result.get("results") else None
+                needs_more = (best_score is None) or (best_score > distance_requery_threshold)
+                effective_k = k
+                if needs_more and k < max_adaptive_k:
+                    boosted_k = min(max_adaptive_k, max(k * 2, k + 2))
+                    logger.info(
+                        "Hop %s: top score %s exceeds requery threshold %s; boosting k to %s",
+                        hop_idx,
+                        best_score,
+                        distance_requery_threshold,
+                        boosted_k,
+                    )
+                    notes.append(
+                        f"[RAG] boosted k from {k} to {boosted_k} (best_score={best_score})"
+                    )
+                    boosted_result, boosted_docs = search_knowledge_base(
+                        query=subquery,
+                        settings=cfg,
+                        persist_dir=None,
+                        k=boosted_k,
+                        return_documents=True,
+                    )
+                    result, documents = boosted_result, boosted_docs
+                    effective_k = boosted_k
 
-            if not result.get("results"):
+                if not result.get("results"):
+                    notes.append("[RAG] no local hits")
+                    hop_serialized.append("\n".join(notes))
+                    continue
+                filtered_results, filtered_docs = _filter_by_score(
+                    result["results"],
+                    documents,
+                    distance_keep_threshold,
+                )
+                all_docs.extend(filtered_docs)
+                notes.append(
+                    f"[RAG] filtered by distance <= {distance_keep_threshold}; kept {len(filtered_results)} of {len(result['results'])} (effective k={effective_k})"
+                )
+                hop_serialized.append(
+                    "\n".join(notes)
+                    + "\n\n"
+                    + "\n\n".join(
+                        f"Source: {item.get('source')} | File: {item.get('filename')} | "
+                        f"Score: {item.get('score')}\n{item.get('content')}"
+                        for item in filtered_results
+                    )
+                )
+
+            if not hop_serialized:
                 return "No local knowledge base hits.", []
-            filtered_results, filtered_docs = _filter_by_score(
-                result["results"],
-                documents,
-                distance_keep_threshold,
-            )
-            notes.append(
-                f"[RAG] filtered by distance <= {distance_keep_threshold}; kept {len(filtered_results)} of {len(result['results'])} (effective k={k})"
-            )
-            serialized = "\n".join(notes) + "\n\n" + "\n\n".join(
-                f"Source: {item.get('source')} | File: {item.get('filename')} | "
-                f"Score: {item.get('score')}\n{item.get('content')}"
-                for item in filtered_results
-            )
-            return serialized, filtered_docs
+
+            return "\n\n---\n\n".join(hop_serialized), all_docs
         except Exception as exc:
             logger.exception("search_knowledge_base failed: %s", exc)
             return f"search_knowledge_base_failed: {exc}", []

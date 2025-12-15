@@ -8,7 +8,6 @@ adds a system note for transparency, and stores rewrite_info in state for downst
 """
 
 import logging
-import os
 from typing import Any, Dict, Optional
 
 from langchain.agents.middleware import AgentMiddleware, AgentState
@@ -25,13 +24,6 @@ DEFAULT_PROMPT = (
 )
 
 
-def _bool_env(name: str, default: bool) -> bool:
-    val = os.getenv(name)
-    if val is None:
-        return default
-    return val.strip().lower() not in {"0", "false", "no", "off"}
-
-
 class QueryRewriteMiddleware(AgentMiddleware[AgentState]):
     def __init__(
         self,
@@ -39,14 +31,14 @@ class QueryRewriteMiddleware(AgentMiddleware[AgentState]):
         *,
         settings: Settings,
         prompt: str = DEFAULT_PROMPT,
-        max_chars: int = 200,
+        max_chars: Optional[int] = None,
         enabled: bool = True,
     ) -> None:
         super().__init__()
         self.model = model
         self.settings = settings
         self.prompt = prompt
-        self.max_chars = max_chars
+        self.max_chars = max_chars if max_chars is not None else settings.rag_rewrite_max_chars
         self.enabled = enabled
 
     def _rewrite(self, text: str) -> Optional[str]:
@@ -99,16 +91,16 @@ class QueryRewriteMiddleware(AgentMiddleware[AgentState]):
 
 def build_rewrite_middleware(model, settings: Settings) -> Optional[QueryRewriteMiddleware]:
     """
-    Build the rewrite middleware if enabled via env.
+    Build the rewrite middleware if enabled via settings (env/CLI).
 
-    Controls:
-    - DEV_RAG_REWRITE: toggle (default on).
-    - DEV_RAG_REWRITE_MAX_CHARS: cap length of rewritten query (default 200).
+    Controls are read from Settings (CLI/env):
+    - rag_rewrite: toggle (default on).
+    - rag_rewrite_max_chars: cap length of rewritten query (default 200).
     """
-    enabled = _bool_env("DEV_RAG_REWRITE", True)
-    max_chars = int(os.getenv("DEV_RAG_REWRITE_MAX_CHARS", "200"))
+    enabled = settings.rag_rewrite
+    max_chars = settings.rag_rewrite_max_chars
     if not enabled:
-        logger.info("Query rewrite middleware disabled via DEV_RAG_REWRITE")
+        logger.info("Query rewrite middleware disabled via rag_rewrite/DEV_RAG_REWRITE")
         return None
     return QueryRewriteMiddleware(
         model,

@@ -136,7 +136,7 @@ def run_agent(
     run_flags = AgentRunFlags()
 
     llm = build_chat_model(cfg)
-    tools = build_tools(cfg, transport=transport, default_k=rag_k, run_flags=run_flags)
+    tools = build_tools(cfg, transport=transport, default_k=rag_k, run_flags=run_flags, llm=llm)
     middleware = []
     rewrite_middleware = build_rewrite_middleware(llm, cfg)
     if rewrite_middleware:
