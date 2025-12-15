@@ -6,9 +6,13 @@ Tool definitions for the DevMate agent (Stage 4).
 Exposes:
 - search_knowledge_base: local RAG over persisted Chroma store
 - search_web: MCP-based Tavily search
+- write_todos: manage the agent's todo list during a run
 """
 
+import json
 import logging
+import os
+from dataclasses import asdict
 from typing import Any, Dict, List, Optional, Tuple
 
 from langchain.tools import tool
@@ -16,11 +20,12 @@ from langchain.tools import tool
 from devmate.config import Settings
 from devmate.rag.retriever import search_knowledge_base
 from devmate.mcp_client.client import call_search_web_sync
-from devmate.agent.run_state import AgentRunFlags
+from devmate.agent.run_state import AgentRunFlags, TodoItem
 
 logger = logging.getLogger(__name__)
 
 ALLOWED_DEPTHS = {"basic", "advanced"}
+ALLOWED_TODO_STATUSES = {"todo", "doing", "done"}
 
 
 def _resolve_transport(explicit: Optional[str], settings: Settings) -> str:
@@ -237,4 +242,80 @@ def build_tools(
             logger.exception("search_web failed: %s", exc)
             return {"error": "search_web_failed", "message": str(exc), "transport": resolved_transport}
 
-    return [search_knowledge_base_tool, search_web_tool]
+    def _normalize_status(status: Optional[str]) -> str:
+        if not status:
+            return "todo"
+        normalized = str(status).strip().lower()
+        return normalized if normalized in ALLOWED_TODO_STATUSES else "todo"
+
+    def _normalize_todos(items: Any) -> List[TodoItem]:
+        """
+        Convert LLM-provided items to a clean list of TodoItem.
+        Accepts list/dict/str for resilience; ignores malformed entries.
+        """
+        if items is None:
+            return []
+        if isinstance(items, dict):
+            items = [items]
+        if isinstance(items, str):
+            # If the model wrapped a JSON array/object in a string, try to parse it first.
+            try:
+                parsed = json.loads(items)
+                if isinstance(parsed, (list, dict)):
+                    items = parsed if isinstance(parsed, list) else [parsed]
+                else:
+                    items = [items]
+            except Exception:
+                items = [items]
+        if not isinstance(items, list):
+            return []
+
+        todos: List[TodoItem] = []
+        for raw in items:
+            if isinstance(raw, str):
+                title = raw.strip()
+                if title:
+                    todos.append(TodoItem(title=title))
+                continue
+            if not isinstance(raw, dict):
+                continue
+            title = str(
+                raw.get("title")
+                or raw.get("task")
+                or raw.get("name")
+                or ""
+            ).strip()
+            if not title:
+                continue
+            status = _normalize_status(raw.get("status"))
+            note = str(raw.get("note") or raw.get("details") or "").strip()
+            todos.append(TodoItem(title=title, status=status, note=note))
+        return todos
+
+    @tool("write_todos", return_direct=False)
+    def write_todos(items: Any) -> Dict[str, Any]:
+        """
+        Replace the current todo list with the provided items.
+        Each item can include: title (required), status (todo/doing/done), note (optional).
+        """
+        todos = _normalize_todos(items)
+        if not todos and run_flags and run_flags.todos:
+            return {
+                "error": "invalid_todos",
+                "message": "No valid todos provided.",
+                "todos": [asdict(t) for t in run_flags.todos],
+            }
+
+        if run_flags is not None:
+            run_flags.todos = todos
+        result_todos = run_flags.todos if run_flags is not None else todos
+        try:
+            logger.info(
+                "write_todos updated plan: %s",
+                "; ".join(f"{t.status.upper()} - {t.title}" for t in result_todos) or "empty",
+            )
+        except Exception:
+            logger.debug("write_todos logging skipped due to serialization error")
+        return {"todos": [asdict(t) for t in result_todos]}
+
+    return [search_knowledge_base_tool, search_web_tool, write_todos]

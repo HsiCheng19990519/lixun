@@ -1,23 +1,15 @@
 # DevMate  
-本分支已完成所有阶段性目标：Stage 1（环境/依赖/配置基线）、Stage 2（MCP 搜索工具）、Stage 3（本地 RAG）、Stage 4（Agent 编排）、Stage 5（徒步路线网站场景，自动写文件与报告）、Stage 6（容器化与 Compose 运行 DevMate），以及 Stage 7 & 8（代码审查、文档与交付）。  
+本分支已完成所有阶段性目标：Stage 1（环境/依赖/配置基线）、Stage 2（MCP 搜索工具）、Stage 3（本地 RAG）、Stage 4（Agent 编排）、Stage 5（徒步路线网站场景，自动写文件与报告）、Stage 6（容器化与 Compose 运行 DevMate），以及 Stage 7 & 8（代码审查、文档与交付），并进行了额外的开发工作，包括自适应 k、查询重写、计划节点等功能。
 
-## 已完成
-- Stage 1：`uv` 管理 Python 3.13；`pyproject.toml` 声明 LangChain 1.x、langchain-chroma、ChatDeepSeek/HF 等依赖；`devmate/config.py::Settings` 统一读取（env > .env > config.toml），敏感文件忽略已处理。  
-- Stage 2：MCP 搜索（FastMCP，集成 Tavily）  
-  - 服务器：`mcp_server/main.py` 暴露 `search_web`，支持 `stdio` / `sse` / `streamable-http`（默认 stdio，可用 `MCP_TRANSPORT` 切换），需 `TAVILY_API_KEY`。  
-  - 客户端：`devmate/mcp_client/client.py`、`scripts/test_mcp_client.py` 默认 stdio，可切换 SSE/HTTP。  
-  - Tavily 调用：`mcp_server/tools.py::SearchService` / `mcp_server/main.py::call_tavily`。  
-- Stage 3：RAG  
-  - 文档：`docs/internal_guidelines.md`、`docs/templates.md`、`docs/internal_fastapi_guidelines.md`。  
-  - 向量库：`devmate/rag/ingest.py`（langchain-chroma + BAAI/bge-m3，持久化 `data/vector_store`，遥测关闭）。  
-  - 检索：`devmate/rag/retriever.py::search_knowledge_base`，脚本 `scripts/test_rag.py` 可验证。  
-- Stage 4：Agent（工具编排）  
-  - 核心：`devmate/agent/core.py`，系统提示强制先查本地（RAG）再查网络（MCP），三段式输出（Plan/Findings/Files）。  
-  - 工具：`devmate/agent/tools.py` 包装 `search_knowledge_base` + `search_web`，校验 `search_depth` 非法值回退到 `basic`。  
-  - 入口：`main.py` / `devmate/cli.py` 支持命令行参数覆盖模型、transport、超时等；`observability.py` 可开启 LangSmith（需配置环境变量）。  
-- Stage 5：徒步路线网站场景，`--stage5` 默认徒步提示，自动写文件到 `data/stage5_output/`，生成 `agent_output.md` 与 `stage5_report.json`，并检查是否调用本地/网络搜索及是否生成 `main.py`/`pyproject.toml`。系统提示要求包含文件代码块、入口与示例运行命令。  
-- Stage 6：容器化（Docker + docker-compose），单镜像复用 app/ingest，外部 Chroma 容器（host/port）+ app 内部 stdio 启动 MCP，支持卷挂载写入输出与日志。  
-- Stage 7 & 8：代码审查、文档与交付在开发过程中已自然覆盖。  
+## 分支说明
+- `main` 分支：当前可运行的 DevMate（Agent + RAG + MCP + Docker/Compose）版本。
+- 如需复现阶段性检查（ `checklist.md` 里的 Stages 1 - 5），请切换到对应 stage 分支查看当时可运行代码与输出。因后续开发修改了之前的文件，在本分支运行中间阶段的代码可能会出现错误。
+
+## 环境要求
+- Python：建议 3.10+（以项目依赖为准）。
+- 包管理：uv（用于同步依赖）。
+- 容器：Docker + Docker Compose（如需使用容器化运行）。
+- 外部服务：按需提供 Tavily Key 与 LLM/Embedding 相关配置。
 
 ## 快速开始
 1) 安装依赖  
@@ -30,82 +22,7 @@ uv sync
 - LLM/Embedding：`MODEL_NAME`、`EMBEDDING_MODEL_NAME`，闭源时 `AI_BASE_URL`、`API_KEY`  
 - RAG：`VECTOR_STORE_DIR`、`CHUNK_SIZE`、`CHUNK_OVERLAP`（可选）  
 
-3) 最小环境验证（仅实例化，不发请求）  
-```
-uv run python scripts/check_env.py
-```
-预期输出（示例，类名可能随配置变化）：  
-```
-LLM: <class 'langchain_openai.chat_models.base.ChatOpenAI'>
-Embedding: <class 'langchain_huggingface.embeddings.huggingface.HuggingFaceEmbeddings'>
-```
-
-4) 启动 MCP 服务器（默认 stdio，可切换 transport）  
-```
-set TAVILY_API_KEY=your_key
-# 默认 stdio：MCP_TRANSPORT=stdio
-uv run python -m mcp_server.main
-# 如需 HTTP：set MCP_TRANSPORT=streamable-http
-# 如需 SSE：set MCP_TRANSPORT=sse
-```
-
-5) 测试 MCP 客户端（默认 stdio）  
-```
-uv run python -m scripts.test_mcp_client --query "model context protocol"
-```
-- HTTP：`--transport http --http-url http://127.0.0.1:8010/mcp`  
-- SSE：`--transport sse`（需 server 以 sse 启动）  
-预期：输出 Tavily 结果（缺 key 时会提示错误），`logs/mcp_server_stderr.log` 可见 `search_web query=...`。
-
-6) 文档摄入（Stage 3）
-```
-uv run python -m scripts.ingest_docs --rebuild
-```
-说明：读取 `docs/`，切分并写入 `data/vector_store`（遥测已禁用）；首次会将 `BAAI/bge-m3` 下载并缓存到 `data/hf_cache`（可用 `EMBEDDING_CACHE_DIR` 覆盖；同时会自动设置 `HF_HOME`/`HUGGINGFACE_HUB_CACHE` 指向该目录），后续复用；如果速度过慢，可以先将 `HF_ENDPOINT` 设为 `https://hf-mirror.com`。
-
-7) 知识库查询（Stage 3 验证）  
-```
-uv run python scripts/test_rag.py --query "project guidelines"
-```
-预期命中本地文档片段（文件名视 docs/ 内容而定）。
-
-8) 运行 Agent（Stage 4 演示）  
-```
-uv run python legacy_main.py --message "我想构建一个展示附近徒步路线的网站项目" --transport stdio --k 4 \
-  --provider ollama --model qwen2.5:14b-instruct --ai-base-url http://127.0.0.1:11434/v1
-```
-- 可用 `--transport http --mcp-http-url http://127.0.0.1:8010/mcp` 切换 HTTP；需要有效 `TAVILY_API_KEY`。  
-- 观测性：设置 `LANGCHAIN_TRACING_V2=true` 及 LangSmith 相关 key 后，CLI 会初始化 tracing。
-预期输出（示例，具体内容随模型/搜索结果变化）：  
-```
-### 计划
-...（规划要点）
-
-### 找到资料
-- 本地文档：internal_guidelines.md / templates.md 等摘录
-- 网络搜索：若 Tavily 200，则列出标题+URL 摘要；若失败，会注明
-
-### 文件
-- 列出建议生成/修改的文件与示例代码块
-```
-
-9) 运行 Agent（Stage 5 检测示例，自动写文件+报告）  
-- 闭源模型（DashScope OpenAI 兼容，如 qwen3-max）：  
-```
-uv run python main.py --stage5 --transport stdio --k 6 --max-iterations 8 \
-  --llm-mode closed_source --provider openai \
-  --model qwen3-max
-```
-- 开源/本地模型（Ollama 示例）：  
-```
-uv run python main.py --stage5 --transport stdio --k 6 --max-iterations 8 \
-  --llm-mode open_source --provider ollama \
-  --model qwen2.5:14b-instruct \
-  --ai-base-url http://127.0.0.1:11434/v1
-```
-预期输出：写入 `data/stage5_output/`（至少包含 `main.py`、`pyproject.toml`、`.env.example` 等），并生成 `agent_output.md` / `stage5_report.json`。`stage5_report.json` 中应包含 `used_local_docs=true`、`used_web_search=true`，以及 `has_main_py=true`、`has_pyproject_toml=true` 的检查结果。  
-
-10) Docker 与 Compose（运行 DevMate 本身）
+3) Docker 与 Compose（运行 DevMate 本身）
 - 构建镜像（基于项目根目录）：  
 ```
 docker compose -f docker/docker-compose.yml build --progress plain
@@ -125,10 +42,68 @@ docker compose -f docker/docker-compose.yml run --rm \
   app \
   /app/.venv/bin/python -m devmate.cli \
   --stage5 --transport stdio \
-  --k 6 --max-iterations 8 \
+  --k 6 --max-iterations 12 \
   --llm-mode closed_source --provider openai --model glm-4.6 \
   --write-files --output-dir /app/data/stage5_output
 ```
+
+4) 输出与产物
+- 模型会落盘生成的代码文件、原始回答与报告，输出目录与文件名可通过 CLI 参数调整（见下文参数一览）。
+
+### 命令行参数一览（可改项 + 默认值）
+覆盖优先级：CLI > 环境变量 > `.env` > `config.toml` > `Settings` 默认。
+- **基础**
+  - `--message/-m`：用户请求内容；不传时启动后会提示输入。  
+  - `--session-name`：LangSmith/LangChain Tracing 会话名，默认 `default`。  
+  - `--transport`：MCP 客户端传输层，`http`/`stdio`/`sse`，默认跟 env `MCP_TRANSPORT`，都无则 `http`。  
+  - `--mcp-http-url`：MCP streamable HTTP 服务地址，默认空（仅 HTTP 模式需要）。  
+  - `MCP_TRANSPORT`（env）：直接指定 MCP 传输层，默认 `http`。  
+- **Stage5 与输出**
+  - `--stage5`：启用徒步场景，自动写文件并生成报告，默认 `false`。  
+  - `--write-files`：是否把 agent 生成的文件块落盘，默认 `false`；Stage5 时强制为 `true`。  
+  - `--output-dir`：写入基目录，Stage5 默认 `data/stage5_output`（容器内 `/app/data/stage5_output`），否则按 agent 返回路径。  
+  - `--stage5-raw-output`：保存原始 markdown 输出的路径，默认 `<output_dir>/agent_output.md`。  
+  - `--stage5-report`：保存 Stage5 JSON 报告的路径，默认 `<output_dir>/stage5_report.json`。  
+  - `--fail-on-missing-search`：Stage5 若未调用本地或网络搜索则退出非零，默认 `false`。  
+- **迭代控制**
+  - `--k`：初始 RAG top-k，必要时自动升高，默认 `4`。  
+  - `--max-iterations`：Agent 工具/LLM 最大轮数，默认 `6`。  
+  - `--recursion-limit`：LangGraph 递归上限，默认 `max_iterations * 2`（防止深层计划溢出）。  
+- **LLM**
+  - `--llm-mode`：选择开源/闭源模型，默认 `closed_source`。  
+  - `--provider`：LLM 提供方（如 openai/ollama/deepseek/zhipu），默认 `zhipu`。  
+  - `--model`：模型名称，默认 `glm-4.6`。  
+  - `--ai-base-url`：OpenAI 兼容接口基址（私有网关时设置），默认空。  
+  - `--api-key`：LLM API Key，默认空（需根据提供方填写）。  
+- **Embedding**
+  - `--embedding-mode`：开源/闭源向量模型，默认 `open_source`。  
+  - `--embedding-provider`：向量提供方，默认 `huggingface`。  
+  - `--embedding-model-name`：向量模型名，默认 `BAAI/bge-m3`。  
+  - `--embedding-device`：运行设备，默认 `cpu`（可填 `cuda:0` 等）。  
+  - `--embedding-base-url` / `--embedding-api-key`：私有或云端向量服务的地址与 Key，默认空。  
+- **RAG / 切分**
+  - `--vector-store-dir`：本地 Chroma 向量库目录，默认 `data/vector_store`。  
+  - `--chunk-strategy`：文本切分策略，默认 `recursive`。  
+  - `--chunk-size`：切分块大小，默认 `1000`。  
+  - `--chunk-overlap`：切分重叠字符数，默认 `200`。  
+  - `--rag-distance-keep-threshold`：保留向量距离上限（越低越严格），默认 `0.6`。  
+  - `--rag-distance-requery-threshold`：若最优距离高于该值则放大 k 重查，默认 `0.8`。  
+  - `--rag-max-k`：自适应重查时的最大 k，默认 `8`。  
+  - `--rag-multi-hop`：是否开启多跳子查询，默认 `False`。  
+  - `--rag-max-subqueries`：多跳时生成的最大子查询数，默认 `3`。  
+  - `--rag-rewrite`：是否启用查询改写中间件，默认 `True`。  
+  - `--rag-rewrite-max-chars`：改写结果的最大长度，默认 `200`。  
+- **Tavily**
+  - `--tavily-api-key`：Tavily 搜索 Key，默认空（必填否则无法搜索）。  
+- **可观测性**
+  - `--langchain-tracing-v2`：开启 LangChain Tracing v2，默认 `True`。  
+  - `--langchain-api-key`：LangChain API Key，默认空。  
+  - `--langsmith-api-key`：LangSmith API Key，默认空。  
+  - `--langsmith-project`：LangSmith 项目名，默认 `devmate`。  
+  - `--langsmith-endpoint`：LangSmith 自定义 Endpoint，默认空。  
+- **日志**
+  - `--log-level`：日志级别，默认 `INFO`。  
+  - `--log-file`：日志文件路径，默认 `logs/devmate.log`。  
 
 ## 文件速览
 - `pyproject.toml`：LangChain 1.x、langchain-chroma、langchain-deepseek、langchain-huggingface、sentence-transformers 等依赖；脚本入口。  
@@ -144,4 +119,12 @@ docker compose -f docker/docker-compose.yml run --rm \
 
 ## 部分问题解决记录
 1) MCP 客户端 stdio 初始化超时：客户端侧使用 `async with ClientSession(...)` 包裹会话，避免 `session.initialize()` 卡死。参考讨论 https://stackoverflow.com/questions/79692462/fastmcp-client-timing-out-while-initializing-the-session。  
-2) 网络搜索工具 400（search_depth 非法）：Agent 曾传 `search_depth=medium` 触发 Tavily 400。现工具侧校验并回退为 `basic`（Tavily 仅接受 basic/advanced，参见 https://docs.tavily.com/documentation/api-reference/endpoint/search）。
+2) 网络搜索工具 400（search_depth 非法）：历史上曾出现传入 medium 导致 Tavily 400。当前工具侧会做校验并在必要时回退为 basic（Tavily 接受 basic/advanced，参见 https://docs.tavily.com/documentation/api-reference/endpoint/search）。
+
+## 未来可改进方向
+- 临时文件系统做上下文卸载：为每次运行分配隔离目录，暴露 `ls/read_file/write_file/edit_file` 工具，长上下文写文件、引用路径，减小 token 压力并便于后续复用。  
+- 子任务/子 Agent 隔离：按职责拆分网络搜索、本地检索、代码生成等子 agent，主 agent 只负责协调与汇总，降低上下文污染。  
+- 持久化记忆：接入 LangGraph Store 等长期存储，把关键决策/中间产物跨会话复用，并设计清理/迁移策略。  
+- 可插拔中间件：在工具调用外层加拦截/审计/截断等中间件，统一处理日志、敏感信息、重试策略。  
+- 性能与耗时：一系列增加的功能让运行时间大幅度上升；可后续加入本地嵌入缓存、并行多路搜索、热点文档预加载、LLM 温启动/复用、超时/截断保护等手段提升速度。  
+- 中间阶段修复：后续开发中修改了之前的文件，导致本分支在运行中间阶段的命令时会出错，不利于读者理解或检查，之后可修复相关冲突，使每个阶段的命令都能得到正确结果。

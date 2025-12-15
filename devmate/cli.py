@@ -39,6 +39,12 @@ def parse_args() -> argparse.Namespace:
         help="Initial RAG top-k (can auto-increase if scores are weak; filtered by score thresholds)",
     )
     parser.add_argument("--max-iterations", type=int, default=6, help="Max tool/LLM iterations")
+    parser.add_argument(
+        "--recursion-limit",
+        type=int,
+        default=None,
+        help="Override LangGraph recursion limit (default: max_iterations * 2).",
+    )
     parser.add_argument("--session-name", default=None, help="Tracing session name")
     parser.add_argument("--write-files", action="store_true", help="Persist generated files to disk")
     parser.add_argument(
@@ -255,6 +261,7 @@ def main() -> None:
         transport=args.transport,
         rag_k=args.k,
         max_iterations=args.max_iterations,
+        recursion_limit=args.recursion_limit,
         session_name=args.session_name,
         write_files=write_files,
         output_dir=effective_output_dir,

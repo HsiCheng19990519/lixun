@@ -19,7 +19,7 @@ from langchain.agents import create_agent
 from langchain_core.messages import HumanMessage
 
 from devmate.agent.tools import build_tools
-from devmate.agent.run_state import AgentRunFlags
+from devmate.agent.run_state import AgentRunFlags, TodoItem
 from devmate.agent.rewrite import build_rewrite_middleware
 from devmate.config import Settings
 from devmate.llm import build_chat_model
@@ -44,11 +44,12 @@ class AgentRunResult:
     used_rag: bool
     used_web: bool
     written_paths: List[str]
+    todos: List[TodoItem]
 
 
 SYSTEM_PROMPT = """You are DevMate, a coding copilot.
 Follow this workflow strictly:
-1) Understand the request and outline a short plan.
+1) Start by calling `write_todos` to outline 3-8 concrete steps (status defaults to todo). After major progress, call `write_todos` again to update status to todo/doing/done.
 2) You MUST call BOTH tools before answering:
    - Call `search_knowledge_base` first for local guidelines/templates. Do NOT claim you searched without calling it. Cite filename+chunk when used.
    - Call `search_web` (MCP/Tavily) next for external best practices/API docs. Do NOT fabricate web findings.
@@ -124,6 +125,7 @@ def run_agent(
     transport: Optional[str] = None,
     rag_k: int = 4,
     max_iterations: int = 6,
+    recursion_limit: Optional[int] = None,
     session_name: Optional[str] = None,
     write_files: bool = False,
     output_dir: Optional[str | Path] = None,
@@ -142,15 +144,17 @@ def run_agent(
     if rewrite_middleware:
         middleware.append(rewrite_middleware)
 
-    # Allow extra headroom beyond max_iterations to accommodate rewrite/system notes.
-    recursion_limit = max_iterations + 4
+    # Allow extra headroom beyond max_iterations to accommodate rewrite/system notes and todo updates.
+    effective_recursion_limit = recursion_limit if recursion_limit is not None else max_iterations * 2
+    if effective_recursion_limit < 1:
+        effective_recursion_limit = 1
 
     agent = create_agent(
         llm,
         tools,
         system_prompt=SYSTEM_PROMPT,
         middleware=middleware,
-    ).with_config({"recursion_limit": recursion_limit})
+    ).with_config({"recursion_limit": effective_recursion_limit})
 
     run_cfg = build_tracing_config(run_name="devmate-agent", session_name=session_name or "default")
     result = agent.invoke({"messages": [HumanMessage(content=message)]}, config=run_cfg)
@@ -173,4 +177,5 @@ def run_agent(
         used_rag=run_flags.used_rag,
         used_web=run_flags.used_web,
         written_paths=written_paths,
+        todos=run_flags.todos,
     )

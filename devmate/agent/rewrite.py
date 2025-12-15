@@ -10,7 +10,8 @@ adds a system note for transparency, and stores rewrite_info in state for downst
 import logging
 from typing import Any, Dict, Optional
 
-from langchain.agents.middleware import AgentMiddleware, AgentState
+from langchain.agents import AgentState
+from langchain.agents.middleware import AgentMiddleware
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from devmate.config import Settings
