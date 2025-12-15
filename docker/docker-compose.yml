@@ -15,7 +15,6 @@ services:
       HF_ENDPOINT: https://hf-mirror.com
       HUGGINGFACE_HUB_BASE_URL: https://hf-mirror.com
       HF_HOME: /app/data/hf_cache
-      TRANSFORMERS_CACHE: /app/data/hf_cache/transformers
       HUGGINGFACE_HUB_CACHE: /app/data/hf_cache/hub
     command: >
       /app/.venv/bin/python -m devmate.cli
@@ -42,7 +41,6 @@ services:
       HF_ENDPOINT: https://hf-mirror.com
       HUGGINGFACE_HUB_BASE_URL: https://hf-mirror.com
       HF_HOME: /app/data/hf_cache
-      TRANSFORMERS_CACHE: /app/data/hf_cache/transformers
       HUGGINGFACE_HUB_CACHE: /app/data/hf_cache/hub
     command: /app/.venv/bin/python -m scripts.ingest_docs --rebuild
     depends_on:

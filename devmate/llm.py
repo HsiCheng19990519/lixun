@@ -154,7 +154,6 @@ def build_embedding_model(settings: Settings):
         # Align all HF caches to the same persistent location so Docker runs reuse downloads.
         os.environ.setdefault("HF_HOME", str(cache_dir))
         os.environ.setdefault("HUGGINGFACE_HUB_CACHE", str(cache_dir / "hub"))
-        os.environ.setdefault("TRANSFORMERS_CACHE", str(cache_dir / "transformers"))
 
     logger.info(
         "Initializing HuggingFaceEmbeddings model=%s device=%s cache_dir=%s",

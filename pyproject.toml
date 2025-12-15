@@ -22,7 +22,7 @@ dependencies = [
   "huggingface-hub>=0.24.0",
   "langchain-huggingface>=0.1.0",
   "sentence-transformers>=2.2.2",
-  "modelcontextprotocol>=0.1.0",
+  "mcp>=1.10.0",
   "langgraph>=1.0.0",
 ]
 
