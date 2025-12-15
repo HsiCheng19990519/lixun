@@ -19,7 +19,7 @@ from langchain.agents import create_agent
 from langchain_core.messages import HumanMessage
 
 from devmate.agent.tools import build_tools
-from devmate.agent.run_state import FLAGS
+from devmate.agent.run_state import AgentRunFlags
 from devmate.config import Settings
 from devmate.llm import build_chat_model
 from devmate.observability import build_tracing_config
@@ -59,7 +59,8 @@ Follow this workflow strictly:
 ```<language>
 <content>
 ```
-5) Do not dump raw tool JSON; summarize key points. If a tool returns an error, continue with available info and note the failure.
+5) When generating code, always generate `main.py` as the application entry point for starting the web server and provide `pyproject.toml` (Python 3.13; dependencies managed via uv/configurable settings), with other necessary files.
+6) Do not dump raw tool JSON; summarize key points. If a tool returns an error, continue with available info and note the failure.
 Final answer MUST have three sections:
 - Plan
 - Findings (local docs / web, with sources)
@@ -131,11 +132,10 @@ def run_agent(
     """
     cfg = settings or Settings()
     logger.info("Agent starting query=%s", message)
-    FLAGS.used_rag = False
-    FLAGS.used_web = False
+    run_flags = AgentRunFlags()
 
     llm = build_chat_model(cfg)
-    tools = build_tools(cfg, transport=transport, default_k=rag_k)
+    tools = build_tools(cfg, transport=transport, default_k=rag_k, run_flags=run_flags)
 
     agent = create_agent(
         llm,
@@ -161,7 +161,7 @@ def run_agent(
         query=message,
         raw_text=final_text,
         files=file_results,
-        used_rag=FLAGS.used_rag,
-        used_web=FLAGS.used_web,
+        used_rag=run_flags.used_rag,
+        used_web=run_flags.used_web,
         written_paths=written_paths,
     )

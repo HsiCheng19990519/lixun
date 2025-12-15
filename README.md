@@ -57,11 +57,11 @@ uv run python -m scripts.test_mcp_client --query "model context protocol"
 - SSE：`--transport sse`（需 server 以 sse 启动）  
 预期：输出 Tavily 结果（缺 key 时会提示错误），`logs/mcp_server_stderr.log` 可见 `search_web query=...`。
 
-6) 文档摄入（Stage 3）  
+6) 文档摄入（Stage 3）
 ```
 uv run python -m scripts.ingest_docs --rebuild
 ```
-说明：读取 `docs/`，切分并写入 `data/vector_store`（遥测已禁用）；如果速度过慢，可以先将 `HF_ENDPOINT` 设为 `https://hf-mirror.com`。
+说明：读取 `docs/`，切分并写入 `data/vector_store`（遥测已禁用）；首次会将 `BAAI/bge-m3` 下载并缓存到 `data/hf_cache`（可用 `EMBEDDING_CACHE_DIR` 覆盖；同时会自动设置 `HF_HOME`/`HUGGINGFACE_HUB_CACHE` 指向该目录），后续复用；如果速度过慢，可以先将 `HF_ENDPOINT` 设为 `https://hf-mirror.com`。
 
 7) 知识库查询（Stage 3 验证）  
 ```
@@ -94,7 +94,7 @@ uv run python legacy_main.py --message "我想构建一个展示附近徒步路�
 ```
 uv run python main.py --stage5 --transport stdio --k 6 --max-iterations 8 \
   --llm-mode closed_source --provider openai \
-  --model qwen3-max \
+  --model qwen3-max
 ```
 - 开源/本地模型（Ollama 示例）：  
 ```
@@ -108,7 +108,7 @@ uv run python main.py --stage5 --transport stdio --k 6 --max-iterations 8 \
 10) Docker 与 Compose（运行 DevMate 本身）
 - 构建镜像（基于项目根目录）：  
 ```
-docker compose -f docker/docker-compose.yml build
+docker compose -f docker/docker-compose.yml build --progress plain
 ```
 - 启动依赖（仅 Chroma，MCP 由 app 进程以 stdio 自行拉起）：  
 ```
@@ -118,7 +118,7 @@ docker compose -f docker/docker-compose.yml up -d vector-db
 ```
 docker compose -f docker/docker-compose.yml run --rm ingest
 ```
-- 运行 Agent（Stage5 默认徒步提示，使用容器内 venv 的 Python）：  
+- 运行 Agent（Stage5，使用容器内 venv 的 Python）：  
 ```
 docker compose -f docker/docker-compose.yml run --rm \
   -e MCP_TRANSPORT=stdio \
