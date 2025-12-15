@@ -57,7 +57,6 @@ docker compose -f docker/docker-compose.yml run --rm \
   - `--session-name`：LangSmith/LangChain Tracing 会话名，默认 `default`。  
   - `--transport`：MCP 客户端传输层，`http`/`stdio`/`sse`，默认跟 env `MCP_TRANSPORT`，都无则 `http`。  
   - `--mcp-http-url`：MCP streamable HTTP 服务地址，默认空（仅 HTTP 模式需要）。  
-  - `MCP_TRANSPORT`（env）：直接指定 MCP 传输层，默认 `http`。  
 - **Stage5 与输出**
   - `--stage5`：启用徒步场景，自动写文件并生成报告，默认 `false`。  
   - `--write-files`：是否把 agent 生成的文件块落盘，默认 `false`；Stage5 时强制为 `true`。  
