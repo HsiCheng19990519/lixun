@@ -97,6 +97,7 @@ def build_tools(
             logger.info("Tool search_knowledge_base called query=%s k=%s", query, k)
             if run_flags:
                 run_flags.used_rag = True
+            notes: List[str] = [f"[RAG] initial k={k}"]
             # First pass
             result, documents = search_knowledge_base(
                 query=query,
@@ -116,6 +117,9 @@ def build_tools(
                     distance_requery_threshold,
                     boosted_k,
                 )
+                notes.append(
+                    f"[RAG] boosted k from {k} to {boosted_k} (best_score={best_score})"
+                )
                 boosted_result, boosted_docs = search_knowledge_base(
                     query=query,
                     settings=cfg,
@@ -125,6 +129,7 @@ def build_tools(
                 )
                 # Merge, keeping order from boosted_result (already top-sorted).
                 result, documents = boosted_result, boosted_docs
+                k = boosted_k  # reflect the effective k used
 
             if not result.get("results"):
                 return "No local knowledge base hits.", []
@@ -133,7 +138,10 @@ def build_tools(
                 documents,
                 distance_keep_threshold,
             )
-            serialized = "\n\n".join(
+            notes.append(
+                f"[RAG] filtered by distance <= {distance_keep_threshold}; kept {len(filtered_results)} of {len(result['results'])} (effective k={k})"
+            )
+            serialized = "\n".join(notes) + "\n\n" + "\n\n".join(
                 f"Source: {item.get('source')} | File: {item.get('filename')} | "
                 f"Score: {item.get('score')}\n{item.get('content')}"
                 for item in filtered_results
