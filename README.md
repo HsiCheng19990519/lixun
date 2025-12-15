@@ -126,7 +126,7 @@ docker compose -f docker/docker-compose.yml run --rm \
   /app/.venv/bin/python -m devmate.cli \
   --stage5 --transport stdio \
   --k 6 --max-iterations 8 \
-  --llm-mode closed_source --provider openai --model qwen3-max \
+  --llm-mode closed_source --provider openai --model glm-4.6 \
   --write-files --output-dir /app/data/stage5_output
 ```
 

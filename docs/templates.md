@@ -1,7 +1,7 @@
 ## Web Project Template Notes
 
 - Structure: keep `src/` for frontend assets, `api/` for backend samples, `tests/` for smoke cases.
-- Entry points: provide `main.py` for backend demo or `index.html` for static demo.
+- Entry points: provide `main.py` for entrypoint.
 - Config: include a `.env.example` showing required variables; always read model name, API keys, and URLs from config/env.
 - Logging: default to `logs/` with rotation.
 - Dependencies: use `uv` + `pyproject.toml`; avoid `requirements.txt`.

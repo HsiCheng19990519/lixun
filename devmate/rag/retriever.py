@@ -53,11 +53,14 @@ def search_knowledge_base(
     settings: Optional[Settings] = None,
     persist_dir: Optional[Path] = None,
     k: int = 4,
-) -> Dict[str, List[Dict[str, object]]]:
+    return_documents: bool = False,
+) -> Dict[str, List[Dict[str, object]]] | tuple[Dict[str, List[Dict[str, object]]], List[object]]:
     """
     Similarity search over the local vector store.
 
-    Returns a dict with query and normalized results.
+    Returns a dict with query and normalized results. If return_documents=True, also returns
+    the raw Document list (with scores injected into metadata) as a second tuple element for
+    downstream use as tool artifacts.
     """
     cfg = settings or Settings()
     setup_logging(cfg)
@@ -65,9 +68,16 @@ def search_knowledge_base(
 
     store = _load_store(cfg, persist_dir)
     docs_with_scores = store.similarity_search_with_score(query, k=k)
+    documents: List[object] = []
 
     results: List[Dict[str, object]] = []
     for doc, score in docs_with_scores:
+        # Preserve score on the document metadata so artifacts carry ranking info.
+        try:
+            doc.metadata["score"] = score
+        except Exception:
+            logger.debug("Unable to set score on document metadata")
+        documents.append(doc)
         results.append(
             {
                 "content": doc.page_content,
@@ -78,4 +88,7 @@ def search_knowledge_base(
             }
         )
 
-    return {"query": query, "results": results}
+    payload: Dict[str, List[Dict[str, object]]] = {"query": query, "results": results}
+    if return_documents:
+        return payload, documents
+    return payload
