@@ -10,7 +10,7 @@ Exposes:
 
 import logging
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from langchain.tools import tool
 
@@ -52,10 +52,40 @@ def build_tools(
 ):
     """
     Return a list of LangChain tools for the agent.
+
+    Adaptive RAG knobs (env):
+    - DEV_RAG_DISTANCE_KEEP_THRESHOLD: drop results with distance higher than this (default 0.6).
+    - DEV_RAG_DISTANCE_REQUERY_THRESHOLD: if best distance is higher, re-query with larger k (default 0.8).
+    - DEV_RAG_MAX_K: upper bound for adaptive k (default 8).
     """
     cfg = settings or Settings()
     resolved_transport = _resolve_transport(transport, cfg)
     resolved_http_url = _resolve_http_url(http_url, cfg)
+    # Adaptive knobs (env-tunable to avoid config churn).
+    distance_keep_threshold = float(os.getenv("DEV_RAG_DISTANCE_KEEP_THRESHOLD", "0.6"))  # lower is better
+    distance_requery_threshold = float(os.getenv("DEV_RAG_DISTANCE_REQUERY_THRESHOLD", "0.8"))
+    max_adaptive_k = int(os.getenv("DEV_RAG_MAX_K", "8"))
+
+    def _filter_by_score(
+        results: List[Dict[str, Any]],
+        documents: List[Any],
+        keep_threshold: float,
+    ) -> Tuple[List[Dict[str, Any]], List[Any]]:
+        """
+        Keep results with distance <= keep_threshold (Chroma returns distance: lower is better).
+        If everything is filtered out, fall back to the best 1-2 hits to avoid empty context.
+        """
+        filtered_pairs: List[Tuple[Dict[str, Any], Any]] = []
+        for item, doc in zip(results, documents):
+            score = item.get("score")
+            if score is None or score <= keep_threshold:
+                filtered_pairs.append((item, doc))
+        if not filtered_pairs and results:
+            # Fallback: keep the top 2 to avoid losing all context.
+            filtered_pairs = list(zip(results[:2], documents[:2]))
+        filtered_results = [r for r, _ in filtered_pairs]
+        filtered_docs = [d for _, d in filtered_pairs]
+        return filtered_results, filtered_docs
 
     @tool("search_knowledge_base", response_format="content_and_artifact", return_direct=False)
     def search_knowledge_base_tool(query: str, k: int = default_k) -> tuple[str, List[Any]]:
@@ -67,6 +97,7 @@ def build_tools(
             logger.info("Tool search_knowledge_base called query=%s k=%s", query, k)
             if run_flags:
                 run_flags.used_rag = True
+            # First pass
             result, documents = search_knowledge_base(
                 query=query,
                 settings=cfg,
@@ -74,14 +105,40 @@ def build_tools(
                 k=k,
                 return_documents=True,
             )
+            best_score = result["results"][0]["score"] if result.get("results") else None
+            # If top score looks weak (distance too high) and we can fetch more, retry with larger k.
+            needs_more = (best_score is None) or (best_score > distance_requery_threshold)
+            if needs_more and k < max_adaptive_k:
+                boosted_k = min(max_adaptive_k, max(k * 2, k + 2))
+                logger.info(
+                    "Top score %s exceeds requery threshold %s; boosting k to %s",
+                    best_score,
+                    distance_requery_threshold,
+                    boosted_k,
+                )
+                boosted_result, boosted_docs = search_knowledge_base(
+                    query=query,
+                    settings=cfg,
+                    persist_dir=None,
+                    k=boosted_k,
+                    return_documents=True,
+                )
+                # Merge, keeping order from boosted_result (already top-sorted).
+                result, documents = boosted_result, boosted_docs
+
             if not result.get("results"):
                 return "No local knowledge base hits.", []
-            serialized = "\n\n".join(
-                f"Source: {item.get('source')} | File: {item.get('filename')} | Score: {item.get('score')}\n"
-                f"{item.get('content')}"
-                for item in result["results"]
+            filtered_results, filtered_docs = _filter_by_score(
+                result["results"],
+                documents,
+                distance_keep_threshold,
             )
-            return serialized, documents
+            serialized = "\n\n".join(
+                f"Source: {item.get('source')} | File: {item.get('filename')} | "
+                f"Score: {item.get('score')}\n{item.get('content')}"
+                for item in filtered_results
+            )
+            return serialized, filtered_docs
         except Exception as exc:
             logger.exception("search_knowledge_base failed: %s", exc)
             return f"search_knowledge_base_failed: {exc}", []

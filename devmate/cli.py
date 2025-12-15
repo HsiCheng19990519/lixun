@@ -32,7 +32,12 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="DevMate Agent CLI (Stage 4)")
     parser.add_argument("-m", "--message", help="User request (if omitted, will prompt)")
     parser.add_argument("--transport", choices=["http", "stdio", "sse"], default=None, help="MCP transport")
-    parser.add_argument("--k", type=int, default=4, help="Top-k for RAG search_knowledge_base")
+    parser.add_argument(
+        "--k",
+        type=int,
+        default=4,
+        help="Initial RAG top-k (can auto-increase if scores are weak; filtered by score thresholds)",
+    )
     parser.add_argument("--max-iterations", type=int, default=6, help="Max tool/LLM iterations")
     parser.add_argument("--session-name", default=None, help="Tracing session name")
     parser.add_argument("--write-files", action="store_true", help="Persist generated files to disk")
