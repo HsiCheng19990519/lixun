@@ -6,9 +6,9 @@
 - 如需复现阶段性检查（ `checklist.md` 里的 Stages 1 - 5），请切换到对应 stage 分支查看当时可运行代码与输出。因后续开发修改了之前的文件，在本分支运行中间阶段的代码可能会出现错误。
 
 ## 环境要求
-- Python：建议 3.10+（以项目依赖为准）。
+- Python：建议 3.13+（以项目依赖为准）。
 - 包管理：uv（用于同步依赖）。
-- 容器：Docker + Docker Compose（如需使用容器化运行）。
+- 容器：Docker + Docker Compose。
 - 外部服务：按需提供 Tavily Key 与 LLM/Embedding 相关配置。
 
 ## 快速开始
