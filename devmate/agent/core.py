@@ -20,6 +20,7 @@ from langchain_core.messages import HumanMessage
 
 from devmate.agent.tools import build_tools
 from devmate.agent.run_state import AgentRunFlags
+from devmate.agent.rewrite import build_rewrite_middleware
 from devmate.config import Settings
 from devmate.llm import build_chat_model
 from devmate.observability import build_tracing_config
@@ -136,12 +137,20 @@ def run_agent(
 
     llm = build_chat_model(cfg)
     tools = build_tools(cfg, transport=transport, default_k=rag_k, run_flags=run_flags)
+    middleware = []
+    rewrite_middleware = build_rewrite_middleware(llm, cfg)
+    if rewrite_middleware:
+        middleware.append(rewrite_middleware)
+
+    # Allow extra headroom beyond max_iterations to accommodate rewrite/system notes.
+    recursion_limit = max_iterations + 4
 
     agent = create_agent(
         llm,
         tools,
         system_prompt=SYSTEM_PROMPT,
-    ).with_config({"recursion_limit": max_iterations})
+        middleware=middleware,
+    ).with_config({"recursion_limit": recursion_limit})
 
     run_cfg = build_tracing_config(run_name="devmate-agent", session_name=session_name or "default")
     result = agent.invoke({"messages": [HumanMessage(content=message)]}, config=run_cfg)
